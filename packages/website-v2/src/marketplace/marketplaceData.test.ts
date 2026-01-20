@@ -169,7 +169,7 @@ describe("resolveHtmlAssetLinks", () => {
     const resolved = resolveHtmlAssetLinks(html, baseUrl, pageLinkMap);
 
     expect(resolved).toContain(
-      'href="/m/gerre34r/library-inlang-paraglideJs/middleware"',
+      'href="/m/gerre34r/library-inlang-paraglideJs/middleware#setup"',
     );
   });
 
