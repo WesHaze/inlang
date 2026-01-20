@@ -163,6 +163,9 @@ export async function loadMarketplacePage({
   let frontmatter: Record<string, {}> | undefined;
   let imports: string[] | undefined;
   let sourceUrl: string | undefined;
+  const pageLinkMap = flatPages
+    ? buildMarketplacePageLinkMap(flatPages, itemPath)
+    : undefined;
 
   if (flatPages) {
     const pageEntry = Object.entries(flatPages).find(
@@ -192,7 +195,11 @@ export async function loadMarketplacePage({
       const mirrorMarkdown = buildMirrorMarkdown(mirrorSpec, exampleContent);
       rawMarkdownContent = mirrorMarkdown;
       const markdown = await parse(mirrorMarkdown);
-      renderedMarkdown = resolveHtmlAssetLinks(markdown.html, sourceUrl);
+      renderedMarkdown = resolveHtmlAssetLinks(
+        markdown.html,
+        sourceUrl,
+        pageLinkMap,
+      );
       frontmatter = resolveFrontmatterLinks(
         markdown.frontmatter as Record<string, {}> | undefined,
         sourceUrl,
@@ -203,7 +210,11 @@ export async function loadMarketplacePage({
       const content = await getContentString(page);
       rawMarkdownContent = content;
       const markdown = await parse(content);
-      renderedMarkdown = resolveHtmlAssetLinks(markdown.html, sourceUrl);
+      renderedMarkdown = resolveHtmlAssetLinks(
+        markdown.html,
+        sourceUrl,
+        pageLinkMap,
+      );
       frontmatter = resolveFrontmatterLinks(
         markdown.frontmatter as Record<string, {}> | undefined,
         sourceUrl,
@@ -219,7 +230,11 @@ export async function loadMarketplacePage({
       const content = await getContentString(readme);
       rawMarkdownContent = content;
       const markdown = await parse(content);
-      renderedMarkdown = resolveHtmlAssetLinks(markdown.html, sourceUrl);
+      renderedMarkdown = resolveHtmlAssetLinks(
+        markdown.html,
+        sourceUrl,
+        pageLinkMap,
+      );
       frontmatter = resolveFrontmatterLinks(
         markdown.frontmatter as Record<string, {}> | undefined,
         sourceUrl,
@@ -315,24 +330,81 @@ function resolveFrontmatterLinks(
   return resolved;
 }
 
-function resolveHtmlAssetLinks(html: string, baseUrl?: string) {
+type PageLinkMap = Map<string, string>;
+
+function buildMarketplacePageLinkMap(
+  pages: Record<string, string>,
+  itemPath: string,
+): PageLinkMap {
+  const map: PageLinkMap = new Map();
+  for (const [route, page] of Object.entries(pages)) {
+    if (!page.startsWith("http")) continue;
+    const target = route === "/" ? itemPath : `${itemPath}${route}`;
+    map.set(normalizePageLinkKey(page), target);
+  }
+  return map;
+}
+
+export function resolveHtmlAssetLinks(
+  html: string,
+  baseUrl?: string,
+  pageLinkMap?: PageLinkMap,
+) {
   if (!baseUrl || !baseUrl.startsWith("http")) return html;
   return html.replace(
     /(src|href)=(["'])([^"']+)\2/gi,
     (_match, attr, quote, value) => {
       const resolved = resolveRelativeUrl(String(value), baseUrl);
+      if (attr.toLowerCase() === "href" && pageLinkMap) {
+        const target = pageLinkMap.get(normalizePageLinkKey(resolved));
+        if (target) {
+          return `${attr}=${quote}${target}${quote}`;
+        }
+      }
       return `${attr}=${quote}${resolved}${quote}`;
     },
   );
 }
 
-function resolveRelativeUrl(value: string, baseUrl: string) {
-  if (!isRelativeUrl(value)) return value;
+function normalizePageLinkKey(value: string) {
   try {
-    return new URL(value, baseUrl).toString();
+    const url = new URL(value);
+    url.hash = "";
+    url.search = "";
+    return url.toString();
   } catch {
     return value;
   }
+}
+
+export function resolveRelativeUrl(value: string, baseUrl: string) {
+  if (!isRelativeUrl(value)) return value;
+  const normalizedValue = appendMarkdownExtensionIfNeeded(value, baseUrl);
+  try {
+    return new URL(normalizedValue, baseUrl).toString();
+  } catch {
+    return value;
+  }
+}
+
+function appendMarkdownExtensionIfNeeded(value: string, baseUrl: string) {
+  if (!baseUrl.includes("raw.githubusercontent.com")) return value;
+  if (!baseUrl.endsWith(".md") && !baseUrl.endsWith(".markdown")) {
+    return value;
+  }
+
+  const match = value.match(/^([^?#]*)([?#].*)?$/);
+  if (!match) return value;
+
+  const path = match[1];
+  const suffix = match[2] ?? "";
+
+  if (!path || path.endsWith("/")) return value;
+
+  const lastSegment = path.split("/").pop() ?? "";
+  if (!lastSegment || lastSegment.includes(".")) return value;
+
+  return `${path}.md${suffix}`;
 }
 
 function isRelativeUrl(value: string) {

@@ -14,7 +14,11 @@ vi.mock("@tanstack/react-router", () => ({
   },
 }));
 
-import { loadMarketplacePage } from "./marketplaceData";
+import {
+  loadMarketplacePage,
+  resolveHtmlAssetLinks,
+  resolveRelativeUrl,
+} from "./marketplaceData";
 
 describe("loadMarketplacePage redirects", () => {
   beforeEach(() => {
@@ -113,5 +117,72 @@ describe("loadMarketplacePage redirects", () => {
     ).rejects.toMatchObject({
       to: "/m/u2/app-inlang-cli/",
     });
+  });
+});
+
+describe("resolveRelativeUrl", () => {
+  it("appends .md for raw github markdown pages with extensionless links", () => {
+    const resolved = resolveRelativeUrl(
+      "./middleware-guide",
+      "https://raw.githubusercontent.com/opral/paraglide-js/refs/heads/main/docs/strategy.md",
+    );
+
+    expect(resolved).toBe(
+      "https://raw.githubusercontent.com/opral/paraglide-js/refs/heads/main/docs/middleware-guide.md",
+    );
+  });
+
+  it("preserves query and hash when appending .md", () => {
+    const resolved = resolveRelativeUrl(
+      "./middleware-guide#setup",
+      "https://raw.githubusercontent.com/opral/paraglide-js/refs/heads/main/docs/strategy.md",
+    );
+
+    expect(resolved).toBe(
+      "https://raw.githubusercontent.com/opral/paraglide-js/refs/heads/main/docs/middleware-guide.md#setup",
+    );
+  });
+
+  it("does not append .md for non-raw URLs", () => {
+    const resolved = resolveRelativeUrl(
+      "./middleware-guide",
+      "https://example.com/docs/strategy.md",
+    );
+
+    expect(resolved).toBe("https://example.com/docs/middleware-guide");
+  });
+});
+
+describe("resolveHtmlAssetLinks", () => {
+  it("rewrites markdown page links to marketplace routes when known", () => {
+    const baseUrl =
+      "https://raw.githubusercontent.com/opral/paraglide-js/refs/heads/main/docs/strategy.md";
+    const html =
+      '<p><a href="./middleware-guide#setup">Middleware Guide</a></p>';
+    const pageLinkMap = new Map([
+      [
+        "https://raw.githubusercontent.com/opral/paraglide-js/refs/heads/main/docs/middleware-guide.md",
+        "/m/gerre34r/library-inlang-paraglideJs/middleware",
+      ],
+    ]);
+
+    const resolved = resolveHtmlAssetLinks(html, baseUrl, pageLinkMap);
+
+    expect(resolved).toContain(
+      'href="/m/gerre34r/library-inlang-paraglideJs/middleware"',
+    );
+  });
+
+  it("keeps non-page links resolved to raw URLs", () => {
+    const baseUrl =
+      "https://raw.githubusercontent.com/opral/paraglide-js/refs/heads/main/docs/strategy.md";
+    const html = '<p><a href="./assets/og.png">Asset</a></p>';
+    const pageLinkMap = new Map();
+
+    const resolved = resolveHtmlAssetLinks(html, baseUrl, pageLinkMap);
+
+    expect(resolved).toContain(
+      'href="https://raw.githubusercontent.com/opral/paraglide-js/refs/heads/main/docs/assets/og.png"',
+    );
   });
 });
