@@ -399,9 +399,10 @@ export function resolveRelativeUrl(
   options: { appendMarkdownExtension?: boolean } = {},
 ) {
   if (!isRelativeUrl(value)) return value;
-  const normalizedValue = options.appendMarkdownExtension
-    ? appendMarkdownExtensionIfNeeded(value, baseUrl)
-    : value;
+  const normalizedValue =
+    options.appendMarkdownExtension && shouldAppendMarkdownExtension(value, baseUrl)
+      ? appendMarkdownExtension(value, baseUrl)
+      : value;
   try {
     return new URL(normalizedValue, baseUrl).toString();
   } catch {
@@ -409,25 +410,39 @@ export function resolveRelativeUrl(
   }
 }
 
-function appendMarkdownExtensionIfNeeded(value: string, baseUrl: string) {
-  if (!baseUrl.includes("raw.githubusercontent.com")) return value;
+function shouldAppendMarkdownExtension(value: string, baseUrl: string) {
+  if (!isRawGithubUrl(baseUrl)) return false;
   const baseExtension = getMarkdownExtension(baseUrl);
-  if (!baseExtension) {
-    return value;
-  }
+  if (!baseExtension) return false;
+  const { path } = splitPathAndSuffix(value);
+  if (!path || path.endsWith("/")) return false;
+  return !hasPathExtension(path);
+}
 
+function appendMarkdownExtension(value: string, baseUrl: string) {
+  const extension = getMarkdownExtension(baseUrl);
+  if (!extension) return value;
+  const { path, suffix } = splitPathAndSuffix(value);
+  if (!path) return value;
+  return `${path}${extension}${suffix}`;
+}
+
+function splitPathAndSuffix(value: string) {
   const match = value.match(/^([^?#]*)([?#].*)?$/);
-  if (!match) return value;
+  return { path: match?.[1] ?? "", suffix: match?.[2] ?? "" };
+}
 
-  const path = match[1];
-  const suffix = match[2] ?? "";
-
-  if (!path || path.endsWith("/")) return value;
-
+function hasPathExtension(path: string) {
   const lastSegment = path.split("/").pop() ?? "";
-  if (!lastSegment || lastSegment.includes(".")) return value;
+  return Boolean(lastSegment && lastSegment.includes("."));
+}
 
-  return `${path}${baseExtension}${suffix}`;
+function isRawGithubUrl(baseUrl: string) {
+  try {
+    return new URL(baseUrl).hostname === "raw.githubusercontent.com";
+  } catch {
+    return baseUrl.includes("raw.githubusercontent.com");
+  }
 }
 
 function getMarkdownExtension(baseUrl: string) {

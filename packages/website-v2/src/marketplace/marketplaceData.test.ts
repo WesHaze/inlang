@@ -145,10 +145,23 @@ describe("resolveRelativeUrl", () => {
     );
   });
 
+  it("handles base URLs with query strings when appending .md", () => {
+    const resolved = resolveRelativeUrl(
+      "./middleware-guide",
+      "https://raw.githubusercontent.com/opral/paraglide-js/refs/heads/main/docs/strategy.md?token=abc",
+      { appendMarkdownExtension: true },
+    );
+
+    expect(resolved).toBe(
+      "https://raw.githubusercontent.com/opral/paraglide-js/refs/heads/main/docs/middleware-guide.md",
+    );
+  });
+
   it("does not append .md for non-raw URLs", () => {
     const resolved = resolveRelativeUrl(
       "./middleware-guide",
       "https://example.com/docs/strategy.md",
+      { appendMarkdownExtension: true },
     );
 
     expect(resolved).toBe("https://example.com/docs/middleware-guide");
