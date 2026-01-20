@@ -358,7 +358,8 @@ export function resolveHtmlAssetLinks(
       if (attr.toLowerCase() === "href" && pageLinkMap) {
         const target = pageLinkMap.get(normalizePageLinkKey(resolved));
         if (target) {
-          return `${attr}=${quote}${target}${quote}`;
+          const suffix = extractSearchAndHash(resolved);
+          return `${attr}=${quote}${target}${suffix}${quote}`;
         }
       }
       return `${attr}=${quote}${resolved}${quote}`;
@@ -377,6 +378,15 @@ function normalizePageLinkKey(value: string) {
   }
 }
 
+function extractSearchAndHash(value: string) {
+  try {
+    const url = new URL(value);
+    return `${url.search}${url.hash}`;
+  } catch {
+    return "";
+  }
+}
+
 export function resolveRelativeUrl(value: string, baseUrl: string) {
   if (!isRelativeUrl(value)) return value;
   const normalizedValue = appendMarkdownExtensionIfNeeded(value, baseUrl);
@@ -389,7 +399,8 @@ export function resolveRelativeUrl(value: string, baseUrl: string) {
 
 function appendMarkdownExtensionIfNeeded(value: string, baseUrl: string) {
   if (!baseUrl.includes("raw.githubusercontent.com")) return value;
-  if (!baseUrl.endsWith(".md") && !baseUrl.endsWith(".markdown")) {
+  const baseExtension = getMarkdownExtension(baseUrl);
+  if (!baseExtension) {
     return value;
   }
 
@@ -404,7 +415,13 @@ function appendMarkdownExtensionIfNeeded(value: string, baseUrl: string) {
   const lastSegment = path.split("/").pop() ?? "";
   if (!lastSegment || lastSegment.includes(".")) return value;
 
-  return `${path}.md${suffix}`;
+  return `${path}${baseExtension}${suffix}`;
+}
+
+function getMarkdownExtension(baseUrl: string) {
+  if (baseUrl.endsWith(".md")) return ".md";
+  if (baseUrl.endsWith(".markdown")) return ".markdown";
+  return null;
 }
 
 function isRelativeUrl(value: string) {
