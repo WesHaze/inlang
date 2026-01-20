@@ -431,8 +431,14 @@ function appendMarkdownExtensionIfNeeded(value: string, baseUrl: string) {
 }
 
 function getMarkdownExtension(baseUrl: string) {
-  if (baseUrl.endsWith(".md")) return ".md";
-  if (baseUrl.endsWith(".markdown")) return ".markdown";
+  try {
+    const url = new URL(baseUrl);
+    if (url.pathname.endsWith(".md")) return ".md";
+    if (url.pathname.endsWith(".markdown")) return ".markdown";
+  } catch {
+    if (baseUrl.endsWith(".md")) return ".md";
+    if (baseUrl.endsWith(".markdown")) return ".markdown";
+  }
   return null;
 }
 
