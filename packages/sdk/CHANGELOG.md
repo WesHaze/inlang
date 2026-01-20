@@ -1,5 +1,11 @@
 # @inlang/sdk
 
+## 2.6.2
+
+### Patch Changes
+
+- 9553df6: Remove the `fileQueueSettled` wait after the initial filesystem sync in `loadProjectFromDirectory` to avoid hangs when file operations never settle.
+
 ## 2.6.1
 
 ### Patch Changes
