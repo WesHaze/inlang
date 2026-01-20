@@ -125,6 +125,7 @@ describe("resolveRelativeUrl", () => {
     const resolved = resolveRelativeUrl(
       "./middleware-guide",
       "https://raw.githubusercontent.com/opral/paraglide-js/refs/heads/main/docs/strategy.md",
+      { appendMarkdownExtension: true },
     );
 
     expect(resolved).toBe(
@@ -136,6 +137,7 @@ describe("resolveRelativeUrl", () => {
     const resolved = resolveRelativeUrl(
       "./middleware-guide#setup",
       "https://raw.githubusercontent.com/opral/paraglide-js/refs/heads/main/docs/strategy.md",
+      { appendMarkdownExtension: true },
     );
 
     expect(resolved).toBe(

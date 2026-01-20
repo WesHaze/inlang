@@ -317,13 +317,17 @@ function resolveFrontmatterLinks(
   for (const key of urlKeys) {
     const value = resolved[key];
     if (typeof value === "string") {
-      resolved[key] = resolveRelativeUrl(value, baseUrl);
+      resolved[key] = resolveRelativeUrl(value, baseUrl, {
+        appendMarkdownExtension: false,
+      });
     }
   }
 
   if (Array.isArray(resolved.imports)) {
     resolved.imports = resolved.imports.map((value) =>
-      typeof value === "string" ? resolveRelativeUrl(value, baseUrl) : value,
+      typeof value === "string"
+        ? resolveRelativeUrl(value, baseUrl, { appendMarkdownExtension: false })
+        : value,
     );
   }
 
@@ -354,7 +358,9 @@ export function resolveHtmlAssetLinks(
   return html.replace(
     /(src|href)=(["'])([^"']+)\2/gi,
     (_match, attr, quote, value) => {
-      const resolved = resolveRelativeUrl(String(value), baseUrl);
+      const resolved = resolveRelativeUrl(String(value), baseUrl, {
+        appendMarkdownExtension: attr.toLowerCase() === "href",
+      });
       if (attr.toLowerCase() === "href" && pageLinkMap) {
         const target = pageLinkMap.get(normalizePageLinkKey(resolved));
         if (target) {
@@ -387,9 +393,15 @@ function extractSearchAndHash(value: string) {
   }
 }
 
-export function resolveRelativeUrl(value: string, baseUrl: string) {
+export function resolveRelativeUrl(
+  value: string,
+  baseUrl: string,
+  options: { appendMarkdownExtension?: boolean } = {},
+) {
   if (!isRelativeUrl(value)) return value;
-  const normalizedValue = appendMarkdownExtensionIfNeeded(value, baseUrl);
+  const normalizedValue = options.appendMarkdownExtension
+    ? appendMarkdownExtensionIfNeeded(value, baseUrl)
+    : value;
   try {
     return new URL(normalizedValue, baseUrl).toString();
   } catch {
