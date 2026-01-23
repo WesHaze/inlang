@@ -432,6 +432,23 @@ describe("Paraglide Message Parser", () => {
    ]);
   });
 
+  it("repro: should match m calls in Vue template before import", () => {
+    const sourceCode = `
+<template>
+  <span>{{ m["common.addNew"]() }}</span>
+</template>
+<script setup lang="ts">
+import * as m from "@/paraglide/messages";
+const testRef = m["common.addNew"]();
+</script>
+`;
+    const result = parse(sourceCode) as Array<{ messageId: string }>;
+    expect(result.map((item) => item.messageId)).toEqual([
+      "common.addNew",
+      "common.addNew",
+    ]);
+  });
+
   it("should match if both dot and bracket notation are used in the same file", () => {
     const sourceCode = `
 		import * as m from "../../i18n-generated/messages";
@@ -471,12 +488,31 @@ describe("Paraglide Message Parser", () => {
 		import * as m from "../../i18n-generated/messages";
 		`;
     const result = parse(sourceCode);
-    expect(result).toEqual([]);
+    expect(result).toEqual([
+      {
+        messageId: "helloWorld",
+        position: {
+          start: { line: 2, character: 5 },
+          end: { line: 2, character: 17 },
+        },
+      },
+    ]);
   });
 
   it("should match if m is defined but no reference to paraglide", () => {
     const sourceCode = `
 		m.helloWorld();
+		`;
+    const result = parse(sourceCode);
+    expect(result).toEqual([]);
+  });
+
+  it("should ignore m imports in comments or strings", () => {
+    const sourceCode = `
+		const m = Math;
+		m.max(1, 2);
+		// import { m } from "@/paraglide/messages"
+		const note = "import { m } from '@/paraglide/messages'";
 		`;
     const result = parse(sourceCode);
     expect(result).toEqual([]);

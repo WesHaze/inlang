@@ -9,10 +9,137 @@
 
 import Parsimmon from "parsimmon";
 
-const createParser = () => {
+const mImportPattern = /import\s+(?:\*\s+as\s+m|\{\s*[^}]*\bm\b[^}]*\})/;
+
+const stripCommentsAndStrings = (sourceCode: string) => {
+  let result = "";
+  let i = 0;
+  const length = sourceCode.length;
+  let state: "code" | "singleLineComment" | "multiLineComment" | "singleQuote" | "doubleQuote" | "template" =
+    "code";
+
+  while (i < length) {
+    const char = sourceCode[i];
+    const next = sourceCode[i + 1];
+
+    if (state === "code") {
+      if (char === "/" && next === "/") {
+        state = "singleLineComment";
+        result += "  ";
+        i += 2;
+        continue;
+      }
+      if (char === "/" && next === "*") {
+        state = "multiLineComment";
+        result += "  ";
+        i += 2;
+        continue;
+      }
+      if (char === "'") {
+        state = "singleQuote";
+        result += " ";
+        i += 1;
+        continue;
+      }
+      if (char === '"') {
+        state = "doubleQuote";
+        result += " ";
+        i += 1;
+        continue;
+      }
+      if (char === "`") {
+        state = "template";
+        result += " ";
+        i += 1;
+        continue;
+      }
+      result += char;
+      i += 1;
+      continue;
+    }
+
+    if (state === "singleLineComment") {
+      if (char === "\n") {
+        state = "code";
+        result += "\n";
+      } else {
+        result += " ";
+      }
+      i += 1;
+      continue;
+    }
+
+    if (state === "multiLineComment") {
+      if (char === "*" && next === "/") {
+        state = "code";
+        result += "  ";
+        i += 2;
+        continue;
+      }
+      result += char === "\n" ? "\n" : " ";
+      i += 1;
+      continue;
+    }
+
+    if (state === "singleQuote") {
+      if (char === "\\" && i + 1 < length) {
+        result += "  ";
+        i += 2;
+        continue;
+      }
+      if (char === "'") {
+        state = "code";
+        result += " ";
+        i += 1;
+        continue;
+      }
+      result += char === "\n" ? "\n" : " ";
+      i += 1;
+      continue;
+    }
+
+    if (state === "doubleQuote") {
+      if (char === "\\" && i + 1 < length) {
+        result += "  ";
+        i += 2;
+        continue;
+      }
+      if (char === '"') {
+        state = "code";
+        result += " ";
+        i += 1;
+        continue;
+      }
+      result += char === "\n" ? "\n" : " ";
+      i += 1;
+      continue;
+    }
+
+    if (state === "template") {
+      if (char === "\\" && i + 1 < length) {
+        result += "  ";
+        i += 2;
+        continue;
+      }
+      if (char === "`") {
+        state = "code";
+        result += " ";
+        i += 1;
+        continue;
+      }
+      result += char === "\n" ? "\n" : " ";
+      i += 1;
+      continue;
+    }
+  }
+
+  return result;
+};
+
+const createParser = (sourceCode: string) => {
   return Parsimmon.createLanguage({
     entry: (r) => {
-      return Parsimmon.alt(r.findReference!, Parsimmon.any)
+      return Parsimmon.alt(r.findMessage!, Parsimmon.any)
         .many()
         .map((matches) => matches.flatMap((match) => match))
         .map((matches) =>
@@ -94,12 +221,22 @@ const createParser = () => {
 
     findMessage: (r) => {
       return Parsimmon.seqMap(
-        Parsimmon.regex(/.*?(?<![a-zA-Z0-9/])m/s), // find m that's not preceded by letters/numbers
+        Parsimmon.index, // capture start offset
+        Parsimmon.regex(/.*?m/s), // find earliest m from current position
         Parsimmon.alt(r.dotNotation!, r.bracketNotation!).or(
           Parsimmon.succeed(null)
         ),
         Parsimmon.regex(/\((?:[^()]|\([^()]*\))*\)/).or(Parsimmon.succeed("")), // function arguments or empty string
-        (_, notation, args) => {
+        (startIndex, match, notation, args) => {
+          const mOffset = startIndex.offset + match.length - 1;
+          const prevChar =
+            mOffset > 0 ? sourceCode[mOffset - 1] ?? "" : "";
+          const hasValidPrefix =
+            mOffset === 0 || !/[a-zA-Z0-9/]/.test(prevChar);
+
+          if (!hasValidPrefix) {
+            return null;
+          }
           // false positive (m not followed by dot or bracket notation)
           if (notation === null) {
             return null;
@@ -126,7 +263,11 @@ const createParser = () => {
 // Parse the expression
 export function parse(sourceCode: string) {
   try {
-    const parser = createParser();
+    const scanSource = sourceCode ? stripCommentsAndStrings(sourceCode) : "";
+    if (!scanSource || !mImportPattern.test(scanSource)) {
+      return [];
+    }
+    const parser = createParser(sourceCode);
     return parser.entry!.tryParse(sourceCode);
   } catch (e) {
     return [];
