@@ -1,11 +1,6 @@
 import { newProject } from "./newProject.js";
 import { loadProjectInMemory } from "./loadProjectInMemory.js";
-import {
-	closeLix,
-	openLixInMemory,
-	toBlob,
-	type Lix,
-} from "@lix-js/sdk";
+import { closeLix, openLixInMemory, toBlob, type Lix } from "@lix-js/sdk";
 import fs from "node:fs";
 import nodePath from "node:path";
 import type { InlangPlugin } from "../plugin/schema.js";

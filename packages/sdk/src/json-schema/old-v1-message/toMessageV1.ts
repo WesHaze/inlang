@@ -71,6 +71,14 @@ function toV1Pattern(pattern: Pattern): PatternV1 {
 				throw new Error(`Unsupported expression argument type`);
 			}
 
+			case "markup-start":
+			case "markup-end":
+			case "markup-standalone": {
+				throw new Error(
+					"Markup placeholders are not supported in MessageV1 conversion"
+				);
+			}
+
 			default: {
 				throw new Error(`Unsupported pattern element type`);
 			}

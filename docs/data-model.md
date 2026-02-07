@@ -84,10 +84,14 @@ Bundle: "items_count"
 
 ## Pattern syntax
 
-Patterns contain text and expressions (variables):
+Patterns contain text, expressions (variables), and markup placeholders:
 
 - **Text** — Plain strings: `"Hello world"`
 - **Expression** — Variables wrapped in braces: `"Hello {name}!"`
+- **Markup start / end** — Wrapping tags: `"{#b}Hello{/b}"`
+- **Markup standalone** — Self-closing tags: `"{#icon/}"`
+- **Markup options** — Named values stored on markup nodes (`options`)
+- **Markup attributes** — Metadata flags/values stored on markup nodes (`attributes`)
 
 Expressions can have annotations for formatting:
 
@@ -96,7 +100,11 @@ Expressions can have annotations for formatting:
 {count: number}      // format as number
 {date: date}         // format as date
 {count: plural}      // pluralization
+{#link}Open{/link}   // markup wrapper
+{#icon/}             // standalone markup
 ```
+
+Markup `options`/`attributes` are part of the SDK data model. Support in import/export plugins can vary by format.
 
 ## Querying the data model
 
@@ -139,4 +147,3 @@ const missing = await project.db
 - [Architecture](/docs/architecture) — See how the data model fits in
 - [Writing a Tool](/docs/write-tool) — Build a tool that queries messages
 - [Plugin API](/docs/plugin-api) — Import types for plugins
-

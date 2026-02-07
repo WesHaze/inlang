@@ -99,4 +99,35 @@ describe("serializeMessage", () => {
       "{gender, select, male {Hello} female {Hello} other {Hello}}",
     );
   });
+
+  it("throws for markup placeholders", () => {
+    const messageId = "message-en";
+    const bundle: Bundle = {
+      id: "bundle",
+      declarations: [],
+    };
+    const message: Message = {
+      id: messageId,
+      bundleId: "bundle",
+      locale: "en",
+      selectors: [],
+    };
+    const variants: Variant[] = [
+      {
+        id: "variant-0",
+        messageId,
+        matches: [],
+        pattern: [
+          { type: "text", value: "Click " },
+          { type: "markup-start", name: "link" },
+          { type: "text", value: "here" },
+          { type: "markup-end", name: "link" },
+        ],
+      },
+    ];
+
+    expect(() => serializeMessage({ bundle, message, variants })).toThrow(
+      "Markup placeholders are not supported by ICU MessageFormat 1",
+    );
+  });
 });

@@ -111,6 +111,45 @@ test("keyInterpolateWithFormatting", async () => {
 	] satisfies Pattern);
 });
 
+test("keyMarkupTransTags", async () => {
+	const imported = await runImportFiles({
+		keyMarkupTransTags: "Click <link>here</link>.<icon/>",
+	});
+	expect(await runExportFilesParsed(imported)).toStrictEqual({
+		keyMarkupTransTags: "Click <link>here</link>.<icon/>",
+	});
+
+	expect(imported.bundles[0]?.declarations).toStrictEqual([]);
+	expect(imported.variants[0]?.pattern).toStrictEqual([
+		{ type: "text", value: "Click " },
+		{ type: "markup-start", name: "link" },
+		{ type: "text", value: "here" },
+		{ type: "markup-end", name: "link" },
+		{ type: "text", value: "." },
+		{ type: "markup-standalone", name: "icon" },
+	] satisfies Pattern);
+});
+
+test("keyMarkupTransTagsWithInterpolation", async () => {
+	const imported = await runImportFiles({
+		keyMarkupTransTagsWithInterpolation: "Hello <b>{{name}}</b><icon/>",
+	});
+	expect(await runExportFilesParsed(imported)).toStrictEqual({
+		keyMarkupTransTagsWithInterpolation: "Hello <b>{{name}}</b><icon/>",
+	});
+
+	expect(imported.bundles[0]?.declarations).toStrictEqual([
+		{ type: "input-variable", name: "name" },
+	]);
+	expect(imported.variants[0]?.pattern).toStrictEqual([
+		{ type: "text", value: "Hello " },
+		{ type: "markup-start", name: "b" },
+		{ type: "expression", arg: { type: "variable-reference", name: "name" } },
+		{ type: "markup-end", name: "b" },
+		{ type: "markup-standalone", name: "icon" },
+	] satisfies Pattern);
+});
+
 test.todo("keyContext", async () => {
 	const imported = await runImportFiles({
 		// catch all
@@ -568,6 +607,43 @@ test("custom variable reference patterns can be provided", async () => {
 		blue: "blue {{blue}}",
 		red: "red <red>",
 	});
+});
+
+test("markup conflicts with angle bracket variable reference pattern", async () => {
+	const settings = {
+		"plugin.inlang.i18next": {
+			variableReferencePattern: ["<", ">"],
+		},
+	};
+
+	const imported = {
+		bundles: [{ id: "rich", declarations: [] }],
+		messages: [
+			{
+				id: "rich-en",
+				bundleId: "rich",
+				locale: "en",
+				selectors: [],
+			},
+		],
+		variants: [
+			{
+				id: "rich-en-default",
+				messageId: "rich-en",
+				matches: [],
+				pattern: [
+					{ type: "text", value: "Click " },
+					{ type: "markup-start", name: "link" },
+					{ type: "text", value: "here" },
+					{ type: "markup-end", name: "link" },
+				],
+			},
+		],
+	};
+
+	await expect(runExportFiles(imported as any, settings)).rejects.toThrow(
+		"Cannot serialize markup when variableReferencePattern is '<' and '>' because both syntaxes would conflict."
+	);
 });
 
 // convenience wrapper for less testing code

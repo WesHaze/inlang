@@ -11,6 +11,51 @@ test("toMessageV1", () => {
 	expect(message).toStrictEqual(messageV1);
 });
 
+test("throws when message contains markup placeholders", () => {
+	const markupBundle: BundleNested = {
+		id: "hello_world",
+		declarations: [],
+		messages: [
+			{
+				bundleId: "hello_world",
+				id: "hello_world_en",
+				locale: "en",
+				selectors: [],
+				variants: [
+					{
+						id: "hello_world_en_1",
+						matches: [],
+						messageId: "hello_world_en",
+						pattern: [
+							{
+								type: "markup-start",
+								name: "b",
+								options: [
+									{
+										name: "kind",
+										value: { type: "literal", value: "strong" },
+									},
+								],
+								attributes: [{ name: "track", value: true }],
+							},
+							{ type: "text", value: "Hello World!" },
+							{
+								type: "markup-end",
+								name: "b",
+								attributes: [{ name: "track", value: true }],
+							},
+						],
+					},
+				],
+			},
+		],
+	};
+
+	expect(() => toMessageV1(markupBundle)).toThrow(
+		"Markup placeholders are not supported in MessageV1 conversion"
+	);
+});
+
 test.todo("with variable references", () => {});
 
 const messageV1: MessageV1 = {

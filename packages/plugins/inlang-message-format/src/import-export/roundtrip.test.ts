@@ -104,6 +104,101 @@ test("it handles variable expressions in patterns", async () => {
 	] satisfies Pattern);
 });
 
+test("it handles markup placeholders in patterns", async () => {
+	const imported = await runImportFiles({
+		contact: "Send {#link}an email{/link}.",
+	});
+	expect(await runExportFilesParsed(imported)).toMatchObject({
+		contact: "Send {#link}an email{/link}.",
+	});
+
+	expect(imported.bundles[0]?.declarations).toStrictEqual([]);
+	expect(imported.variants[0]?.pattern).toStrictEqual([
+		{ type: "text", value: "Send " },
+		{ type: "markup-start", name: "link" },
+		{ type: "text", value: "an email" },
+		{ type: "markup-end", name: "link" },
+		{ type: "text", value: "." },
+	] satisfies Pattern);
+});
+
+test("it handles markup placeholders mixed with expressions", async () => {
+	const imported = await runImportFiles({
+		welcome: "{#b}Hi {name}{/b}{#icon/}",
+	});
+	expect(await runExportFilesParsed(imported)).toMatchObject({
+		welcome: "{#b}Hi {name}{/b}{#icon/}",
+	});
+
+	expect(imported.bundles[0]?.declarations).toStrictEqual([
+		{ type: "input-variable", name: "name" },
+	] satisfies Declaration[]);
+	expect(imported.variants[0]?.pattern).toStrictEqual([
+		{ type: "markup-start", name: "b" },
+		{ type: "text", value: "Hi " },
+		{
+			type: "expression",
+			arg: { type: "variable-reference", name: "name" },
+		},
+		{ type: "markup-end", name: "b" },
+		{ type: "markup-standalone", name: "icon" },
+	] satisfies Pattern);
+});
+
+test("it handles markup options and attributes", async () => {
+	const imported = await runImportFiles({
+		cta: "{#link to=|/docs| rel=$relationship @track @variant=|hero|}Read docs{/link}",
+	});
+	expect(await runExportFilesParsed(imported)).toMatchObject({
+		cta: "{#link to=|/docs| rel=$relationship @track @variant=|hero|}Read docs{/link}",
+	});
+
+	expect(imported.bundles[0]?.declarations).toStrictEqual([
+		{ type: "input-variable", name: "relationship" },
+	] satisfies Declaration[]);
+	expect(imported.variants[0]?.pattern).toStrictEqual([
+		{
+			type: "markup-start",
+			name: "link",
+			options: [
+				{ name: "to", value: { type: "literal", value: "/docs" } },
+				{
+					name: "rel",
+					value: { type: "variable-reference", name: "relationship" },
+				},
+			],
+			attributes: [
+				{ name: "track", value: true },
+				{ name: "variant", value: { type: "literal", value: "hero" } },
+			],
+		},
+		{ type: "text", value: "Read docs" },
+		{ type: "markup-end", name: "link" },
+	] satisfies Pattern);
+});
+
+test("it handles standalone markup options and escaped literals", async () => {
+	const imported = await runImportFiles({
+		icon: "{#icon name=|pipe\\|value| path=|C:\\\\icons\\\\ok| @decorative/}",
+	});
+	expect(await runExportFilesParsed(imported)).toMatchObject({
+		icon: "{#icon name=|pipe\\|value| path=|C:\\\\icons\\\\ok| @decorative/}",
+	});
+
+	expect(imported.bundles[0]?.declarations).toStrictEqual([]);
+	expect(imported.variants[0]?.pattern).toStrictEqual([
+		{
+			type: "markup-standalone",
+			name: "icon",
+			options: [
+				{ name: "name", value: { type: "literal", value: "pipe|value" } },
+				{ name: "path", value: { type: "literal", value: "C:\\icons\\ok" } },
+			],
+			attributes: [{ name: "decorative", value: true }],
+		},
+	] satisfies Pattern);
+});
+
 test("it adds the $schema property", async () => {
 	const imported = await runImportFiles({
 		key: "value",
