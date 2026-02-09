@@ -202,22 +202,13 @@ function parsePattern(value: string): {
 		}
 
 		if (char === "{") {
-			let placeholder = "";
-			let closingIndex = -1;
-
-			for (let cursor = index + 1; cursor < value.length; cursor += 1) {
-				const current = value[cursor];
-				if (current === "}") {
-					closingIndex = cursor;
-					break;
-				}
-				placeholder += current;
-			}
+			const closingIndex = findPlaceholderClosingIndex(value, index);
 
 			if (closingIndex === -1) {
 				buffer += char;
 				continue;
 			}
+			const placeholder = value.slice(index + 1, closingIndex);
 
 			const markupNode = parseMarkupPlaceholder(placeholder);
 			flushBuffer();
@@ -260,6 +251,30 @@ function parsePattern(value: string): {
 		declarations,
 		pattern,
 	};
+}
+
+function findPlaceholderClosingIndex(value: string, openingIndex: number): number {
+	let inQuotedLiteral = false;
+
+	for (let cursor = openingIndex + 1; cursor < value.length; cursor += 1) {
+		const current = value[cursor]!;
+
+		if (inQuotedLiteral && current === "\\") {
+			cursor += 1;
+			continue;
+		}
+
+		if (current === "|") {
+			inQuotedLiteral = !inQuotedLiteral;
+			continue;
+		}
+
+		if (current === "}" && inQuotedLiteral === false) {
+			return cursor;
+		}
+	}
+
+	return -1;
 }
 
 function parseMarkupPlaceholder(placeholder: string):
@@ -425,14 +440,14 @@ function parseMarkupValue(
 		let cursor = index + 1;
 		let literal = "";
 		while (cursor < value.length) {
-			const char = value[cursor]!;
-			if (char === "\\") {
-				const next = value[cursor + 1];
-				if (next === "|" || next === "\\") {
-					literal += next;
-					cursor += 2;
-					continue;
-				}
+				const char = value[cursor]!;
+				if (char === "\\") {
+					const next = value[cursor + 1];
+					if (next === "|" || next === "\\" || next === "}") {
+						literal += next;
+						cursor += 2;
+						continue;
+					}
 				literal += char;
 				cursor += 1;
 				continue;

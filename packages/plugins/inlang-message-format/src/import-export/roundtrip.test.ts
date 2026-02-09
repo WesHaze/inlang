@@ -199,6 +199,49 @@ test("it handles standalone markup options and escaped literals", async () => {
 	] satisfies Pattern);
 });
 
+test("it handles closing braces inside markup quoted literals", async () => {
+	const imported = await runImportFiles({
+		cta: "{#link to=|/docs}v2| @variant=|hero}banner|}Read docs{/link}",
+	});
+	expect(await runExportFilesParsed(imported)).toMatchObject({
+		cta: "{#link to=|/docs\\}v2| @variant=|hero\\}banner|}Read docs{/link}",
+	});
+
+	expect(imported.bundles[0]?.declarations).toStrictEqual([]);
+	expect(imported.variants[0]?.pattern).toStrictEqual([
+		{
+			type: "markup-start",
+			name: "link",
+			options: [{ name: "to", value: { type: "literal", value: "/docs}v2" } }],
+			attributes: [
+				{ name: "variant", value: { type: "literal", value: "hero}banner" } },
+			],
+		},
+		{ type: "text", value: "Read docs" },
+		{ type: "markup-end", name: "link" },
+	] satisfies Pattern);
+});
+
+test("it unescapes escaped closing braces in markup quoted literals", async () => {
+	const imported = await runImportFiles({
+		cta: "{#link to=|/docs\\}v2|}Read docs{/link}",
+	});
+	expect(await runExportFilesParsed(imported)).toMatchObject({
+		cta: "{#link to=|/docs\\}v2|}Read docs{/link}",
+	});
+
+	expect(imported.bundles[0]?.declarations).toStrictEqual([]);
+	expect(imported.variants[0]?.pattern).toStrictEqual([
+		{
+			type: "markup-start",
+			name: "link",
+			options: [{ name: "to", value: { type: "literal", value: "/docs}v2" } }],
+		},
+		{ type: "text", value: "Read docs" },
+		{ type: "markup-end", name: "link" },
+	] satisfies Pattern);
+});
+
 test("it adds the $schema property", async () => {
 	const imported = await runImportFiles({
 		key: "value",

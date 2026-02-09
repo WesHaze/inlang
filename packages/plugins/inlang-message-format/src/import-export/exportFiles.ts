@@ -222,7 +222,7 @@ function serializeMarkup(
 }
 
 function escapeMarkupLiteral(value: string): string {
-	return value.replace(/\\/g, "\\\\").replace(/\|/g, "\\|");
+	return value.replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/}/g, "\\}");
 }
 
 // input: { platform: "android", userGender: "male" }
