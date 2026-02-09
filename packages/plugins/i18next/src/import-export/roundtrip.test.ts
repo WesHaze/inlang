@@ -150,6 +150,47 @@ test("keyMarkupTransTagsWithInterpolation", async () => {
 	] satisfies Pattern);
 });
 
+test("keyMarkupNumericTransTags", async () => {
+	const imported = await runImportFiles({
+		keyMarkupNumericTransTags: "Click <0>here</0>.<1/>",
+	});
+	expect(await runExportFilesParsed(imported)).toStrictEqual({
+		keyMarkupNumericTransTags: "Click <0>here</0>.<1/>",
+	});
+
+	expect(imported.bundles[0]?.declarations).toStrictEqual([]);
+	expect(imported.variants[0]?.pattern).toStrictEqual([
+		{ type: "text", value: "Click " },
+		{ type: "markup-start", name: "0" },
+		{ type: "text", value: "here" },
+		{ type: "markup-end", name: "0" },
+		{ type: "text", value: "." },
+		{ type: "markup-standalone", name: "1" },
+	] satisfies Pattern);
+});
+
+test("keyMarkupMixedNamedAndNumericTransTags", async () => {
+	const imported = await runImportFiles({
+		keyMarkupMixedNamedAndNumericTransTags: "A <0>nested <b>tag</b></0> <icon/>",
+	});
+	expect(await runExportFilesParsed(imported)).toStrictEqual({
+		keyMarkupMixedNamedAndNumericTransTags: "A <0>nested <b>tag</b></0> <icon/>",
+	});
+
+	expect(imported.bundles[0]?.declarations).toStrictEqual([]);
+	expect(imported.variants[0]?.pattern).toStrictEqual([
+		{ type: "text", value: "A " },
+		{ type: "markup-start", name: "0" },
+		{ type: "text", value: "nested " },
+		{ type: "markup-start", name: "b" },
+		{ type: "text", value: "tag" },
+		{ type: "markup-end", name: "b" },
+		{ type: "markup-end", name: "0" },
+		{ type: "text", value: " " },
+		{ type: "markup-standalone", name: "icon" },
+	] satisfies Pattern);
+});
+
 test.todo("keyContext", async () => {
 	const imported = await runImportFiles({
 		// catch all

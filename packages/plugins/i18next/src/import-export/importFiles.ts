@@ -353,7 +353,7 @@ function parseMarkupTagAt(
 	| undefined {
 	const rest = value.slice(startIndex);
 
-	const standalone = rest.match(/^<([A-Za-z][A-Za-z0-9_.-]*)\s*\/>/);
+	const standalone = rest.match(/^<([A-Za-z0-9][A-Za-z0-9_.-]*)\s*\/>/);
 	if (standalone) {
 		const name = standalone[1]!;
 		return {
@@ -362,7 +362,7 @@ function parseMarkupTagAt(
 		};
 	}
 
-	const end = rest.match(/^<\/([A-Za-z][A-Za-z0-9_.-]*)\s*>/);
+	const end = rest.match(/^<\/([A-Za-z0-9][A-Za-z0-9_.-]*)\s*>/);
 	if (end) {
 		const name = end[1]!;
 		return {
@@ -371,7 +371,7 @@ function parseMarkupTagAt(
 		};
 	}
 
-	const start = rest.match(/^<([A-Za-z][A-Za-z0-9_.-]*)\s*>/);
+	const start = rest.match(/^<([A-Za-z0-9][A-Za-z0-9_.-]*)\s*>/);
 	if (start) {
 		const name = start[1]!;
 		return {
