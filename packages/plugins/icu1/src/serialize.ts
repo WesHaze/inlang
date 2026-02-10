@@ -193,10 +193,18 @@ function serializePattern(
 ): string {
   return pattern
     .map((part: Pattern[number]) => {
-      if (part.type === "text") {
-        return escapeText(part.value, options);
+      switch (part.type) {
+        case "text":
+          return escapeText(part.value, options);
+        case "expression":
+          return serializeExpression(part, options);
+        case "markup-start":
+        case "markup-end":
+        case "markup-standalone":
+          throw new Error(
+            "Markup placeholders are not supported by ICU MessageFormat 1",
+          );
       }
-      return serializeExpression(part, options);
     })
     .join("");
 }

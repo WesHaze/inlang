@@ -270,58 +270,117 @@ function parsePattern(
 	const variableReferences: VariableReference[] = [];
 
 	const pattern = settings?.variableReferencePattern ?? ["{{", "}}"];
+	const openPattern = pattern[0];
+	const closePattern = pattern[1];
+	let buffer = "";
 
-	// splits a pattern like "Hello {{name}}!" into an array of parts
-	// "hello {{name}}, how are you?" -> ["hello ", "{{name}}", ", how are you?"]
-	const parts = value
-		.split(new RegExp(`(${pattern[0]}.*?${pattern[1]})`))
-		.filter((part) => part !== "");
-
-	for (const part of parts) {
-		// it's text
-		if (
-			(part.startsWith(pattern[0]!) && part.endsWith(pattern[1]!)) === false
-		) {
-			result.push({ type: "text", value: part });
+	const flushBuffer = () => {
+		if (buffer.length > 0) {
+			result.push({ type: "text", value: buffer });
+			buffer = "";
 		}
-		// it's an expression
-		else {
-			// i18next allows for annotations like `{{name, uppercase}}`
-			const subparts = part
-				.slice(pattern[0]!.length, -pattern[1]!.length)
-				.split(",");
+	};
 
-			const arg = subparts[0]?.trim();
-			const annotation = subparts[1]?.trim();
+	for (let index = 0; index < value.length; index += 1) {
+		// parse interpolation first to avoid conflicts with custom patterns
+		if (openPattern && closePattern && value.startsWith(openPattern, index)) {
+			const closingIndex = value.indexOf(closePattern, index + openPattern.length);
+			if (closingIndex !== -1) {
+				flushBuffer();
 
-			if (arg === undefined) {
-				throw new Error(
-					"Expected an argument in the expression but received undefined."
-				);
+				// i18next allows for annotations like `{{name, uppercase}}`
+				const subparts = value
+					.slice(index + openPattern.length, closingIndex)
+					.split(",");
+
+				const arg = subparts[0]?.trim();
+				const annotation = subparts[1]?.trim();
+
+				if (arg === undefined) {
+					throw new Error(
+						"Expected an argument in the expression but received undefined."
+					);
+				}
+
+				const variableReference: VariableReference = {
+					type: "variable-reference",
+					name: arg,
+				};
+
+				variableReferences.push(variableReference);
+
+				result.push({
+					type: "expression",
+					arg: variableReference,
+					...(annotation && {
+						annotation: {
+							type: "function-reference",
+							name: annotation,
+							options: [],
+						},
+					}),
+				});
+
+				index = closingIndex + closePattern.length - 1;
+				continue;
 			}
-
-			const variableReference: VariableReference = {
-				type: "variable-reference",
-				name: arg,
-			};
-
-			variableReferences.push(variableReference);
-
-			result.push({
-				type: "expression",
-				arg: variableReference,
-				...(annotation && {
-					annotation: {
-						type: "function-reference",
-						name: annotation,
-						options: [],
-					},
-				}),
-			});
 		}
+
+		const markupMatch = parseMarkupTagAt(value, index);
+		if (markupMatch) {
+			flushBuffer();
+			result.push(markupMatch.part);
+			index = markupMatch.endIndex;
+			continue;
+		}
+
+		buffer += value[index]!;
 	}
 
+	flushBuffer();
+
 	return { variableReferences, result };
+}
+
+function parseMarkupTagAt(
+	value: string,
+	startIndex: number
+):
+	| {
+			part: Pattern[number];
+			endIndex: number;
+	  }
+	| undefined {
+	const rest = value.slice(startIndex);
+
+	const standalone = rest.match(/^<([A-Za-z0-9][A-Za-z0-9_.-]*)\s*\/>/);
+	if (standalone) {
+		const name = standalone[1]!;
+		return {
+			part: { type: "markup-standalone", name },
+			endIndex: startIndex + standalone[0].length - 1,
+		};
+	}
+
+	const end = rest.match(/^<\/([A-Za-z0-9][A-Za-z0-9_.-]*)\s*>/);
+	if (end) {
+		const name = end[1]!;
+		return {
+			part: { type: "markup-end", name },
+			endIndex: startIndex + end[0].length - 1,
+		};
+	}
+
+	const start = rest.match(/^<([A-Za-z0-9][A-Za-z0-9_.-]*)\s*>/);
+	if (start) {
+		const name = start[1]!;
+		return {
+			part: { type: "markup-start", name },
+			endIndex: startIndex + start[0].length - 1,
+		};
+	}
+
+	return undefined;
 }
 const removeDuplicates = <T extends any[]>(arr: T) =>
 	[...new Set(arr.map((item) => JSON.stringify(item)))].map((item) =>

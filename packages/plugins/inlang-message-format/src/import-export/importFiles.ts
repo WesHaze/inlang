@@ -1,5 +1,7 @@
 import type {
+	Attribute,
 	Match,
+	Option,
 	Variant,
 	MessageImport,
 	VariantImport,
@@ -200,34 +202,41 @@ function parsePattern(value: string): {
 		}
 
 		if (char === "{") {
-			let variableName = "";
-			let closingIndex = -1;
-
-			for (let cursor = index + 1; cursor < value.length; cursor += 1) {
-				const current = value[cursor];
-				if (current === "}") {
-					closingIndex = cursor;
-					break;
-				}
-				variableName += current;
-			}
+			const closingIndex = findPlaceholderClosingIndex(value, index);
 
 			if (closingIndex === -1) {
 				buffer += char;
 				continue;
 			}
+			const placeholder = value.slice(index + 1, closingIndex);
 
+			const markupNode = parseMarkupPlaceholder(placeholder);
 			flushBuffer();
+
+			if (markupNode) {
+				for (const option of markupNode.options ?? []) {
+					if (option.value.type === "variable-reference") {
+						declarations.push({
+							type: "input-variable",
+							name: option.value.name,
+						});
+					}
+				}
+				pattern.push(markupNode);
+				index = closingIndex;
+				continue;
+			}
+
 			// this is a heuristic. there is no guarentee that the variable might not be
 			// a local variable. only use the returned declarations in a single variant
 			// context
 			declarations.push({
 				type: "input-variable",
-				name: variableName,
+				name: placeholder,
 			});
 			pattern.push({
 				type: "expression",
-				arg: { type: "variable-reference", name: variableName },
+				arg: { type: "variable-reference", name: placeholder },
 			});
 			index = closingIndex;
 			continue;
@@ -241,6 +250,234 @@ function parsePattern(value: string): {
 	return {
 		declarations,
 		pattern,
+	};
+}
+
+function findPlaceholderClosingIndex(value: string, openingIndex: number): number {
+	let inQuotedLiteral = false;
+
+	for (let cursor = openingIndex + 1; cursor < value.length; cursor += 1) {
+		const current = value[cursor]!;
+
+		if (inQuotedLiteral && current === "\\") {
+			cursor += 1;
+			continue;
+		}
+
+		if (current === "|") {
+			inQuotedLiteral = !inQuotedLiteral;
+			continue;
+		}
+
+		if (current === "}" && inQuotedLiteral === false) {
+			return cursor;
+		}
+	}
+
+	return -1;
+}
+
+function parseMarkupPlaceholder(placeholder: string):
+	| {
+			type: "markup-start" | "markup-end" | "markup-standalone";
+			name: string;
+			options?: Option[];
+			attributes?: Attribute[];
+	  }
+	| undefined {
+	if (placeholder.startsWith("#")) {
+		const parsed = parseMarkupBody(placeholder.slice(1), true);
+		if (!parsed) {
+			throw new Error(`Invalid markup placeholder: {${placeholder}}`);
+		}
+		const { name, options, attributes, standalone } = parsed;
+		return {
+			type: standalone ? "markup-standalone" : "markup-start",
+			name,
+			...(options.length > 0 ? { options } : {}),
+			...(attributes.length > 0 ? { attributes } : {}),
+		};
+	}
+
+	if (placeholder.startsWith("/")) {
+		const parsed = parseMarkupBody(placeholder.slice(1), false);
+		if (!parsed) {
+			throw new Error(`Invalid markup placeholder: {${placeholder}}`);
+		}
+		const { name, options, attributes } = parsed;
+		return {
+			type: "markup-end",
+			name,
+			...(options.length > 0 ? { options } : {}),
+			...(attributes.length > 0 ? { attributes } : {}),
+		};
+	}
+
+	return undefined;
+}
+
+function parseMarkupBody(
+	body: string,
+	allowStandalone: boolean
+):
+	| {
+			name: string;
+			options: Option[];
+			attributes: Attribute[];
+			standalone: boolean;
+	  }
+	| undefined {
+	let index = 0;
+	const options: Option[] = [];
+	const attributes: Attribute[] = [];
+	let standalone = false;
+
+	index = skipWhitespace(body, index);
+	const nameToken = readNameToken(body, index);
+	if (!nameToken) return undefined;
+	const name = nameToken.value;
+	index = nameToken.nextIndex;
+
+	while (index < body.length) {
+		index = skipWhitespace(body, index);
+		if (index >= body.length) break;
+
+		if (allowStandalone && body[index] === "/") {
+			const trailing = body.slice(index + 1).trim();
+			if (trailing.length > 0) return undefined;
+			standalone = true;
+			index = body.length;
+			break;
+		}
+
+		if (body[index] === "@") {
+			index += 1;
+			const attributeName = readIdentifier(body, index);
+			if (!attributeName) return undefined;
+			index = attributeName.nextIndex;
+			index = skipWhitespace(body, index);
+
+			if (body[index] === "=") {
+				index += 1;
+				index = skipWhitespace(body, index);
+				const attributeValue = parseMarkupValue(body, index);
+				if (!attributeValue) return undefined;
+				if (attributeValue.value.type === "variable-reference") {
+					// Attributes only support literal values.
+					return undefined;
+				}
+				attributes.push({
+					name: attributeName.value,
+					value: attributeValue.value,
+				});
+				index = attributeValue.nextIndex;
+			} else {
+				attributes.push({ name: attributeName.value, value: true });
+			}
+			continue;
+		}
+
+		const optionName = readIdentifier(body, index);
+		if (!optionName) return undefined;
+		index = optionName.nextIndex;
+		index = skipWhitespace(body, index);
+		if (body[index] !== "=") return undefined;
+		index += 1;
+		index = skipWhitespace(body, index);
+
+		const optionValue = parseMarkupValue(body, index);
+		if (!optionValue) return undefined;
+		options.push({
+			name: optionName.value,
+			value: optionValue.value,
+		});
+		index = optionValue.nextIndex;
+	}
+
+	return { name, options, attributes, standalone };
+}
+
+function skipWhitespace(value: string, index: number): number {
+	while (index < value.length && /\s/.test(value[index]!)) {
+		index += 1;
+	}
+	return index;
+}
+
+function readNameToken(
+	value: string,
+	index: number
+): { value: string; nextIndex: number } | undefined {
+	return readIdentifier(value, index);
+}
+
+function readIdentifier(
+	value: string,
+	index: number
+): { value: string; nextIndex: number } | undefined {
+	let cursor = index;
+	while (
+		cursor < value.length &&
+		/\s/.test(value[cursor]!) === false &&
+		value[cursor] !== "=" &&
+		value[cursor] !== "/" &&
+		value[cursor] !== "@"
+	) {
+		cursor += 1;
+	}
+	const parsed = value.slice(index, cursor);
+	if (parsed.length === 0) return undefined;
+	return { value: parsed, nextIndex: cursor };
+}
+
+function parseMarkupValue(
+	value: string,
+	index: number
+): { value: Option["value"]; nextIndex: number } | undefined {
+	if (index >= value.length) return undefined;
+
+	if (value[index] === "|") {
+		let cursor = index + 1;
+		let literal = "";
+		while (cursor < value.length) {
+				const char = value[cursor]!;
+				if (char === "\\") {
+					const next = value[cursor + 1];
+					if (next === "|" || next === "\\" || next === "}") {
+						literal += next;
+						cursor += 2;
+						continue;
+					}
+				literal += char;
+				cursor += 1;
+				continue;
+			}
+			if (char === "|") {
+				return {
+					value: { type: "literal", value: literal },
+					nextIndex: cursor + 1,
+				};
+			}
+			literal += char;
+			cursor += 1;
+		}
+		return undefined;
+	}
+
+	if (value[index] === "$") {
+		const variable = readIdentifier(value, index + 1);
+		if (!variable) return undefined;
+		return {
+			value: { type: "variable-reference", name: variable.value },
+			nextIndex: variable.nextIndex,
+		};
+	}
+
+	const literal = readIdentifier(value, index);
+	if (!literal) return undefined;
+	return {
+		value: { type: "literal", value: literal.value },
+		nextIndex: literal.nextIndex,
 	};
 }
 

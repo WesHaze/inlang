@@ -18,6 +18,12 @@ export const Option = Type.Object({
 	value: Type.Union([Literal, VariableReference]),
 });
 
+export type Attribute = Static<typeof Attribute>;
+export const Attribute = Type.Object({
+	name: Type.String(),
+	value: Type.Union([Literal, Type.Literal(true)]),
+});
+
 export type FunctionReference = Static<typeof FunctionReference>;
 export const FunctionReference = Type.Object({
 	type: Type.Literal("function-reference"),
@@ -38,6 +44,30 @@ export const Text = Type.Object({
 	value: Type.String(),
 });
 
+export type MarkupStart = Static<typeof MarkupStart>;
+export const MarkupStart = Type.Object({
+	type: Type.Literal("markup-start"),
+	name: Type.String(),
+	options: Type.Optional(Type.Array(Option)),
+	attributes: Type.Optional(Type.Array(Attribute)),
+});
+
+export type MarkupEnd = Static<typeof MarkupEnd>;
+export const MarkupEnd = Type.Object({
+	type: Type.Literal("markup-end"),
+	name: Type.String(),
+	options: Type.Optional(Type.Array(Option)),
+	attributes: Type.Optional(Type.Array(Attribute)),
+});
+
+export type MarkupStandalone = Static<typeof MarkupStandalone>;
+export const MarkupStandalone = Type.Object({
+	type: Type.Literal("markup-standalone"),
+	name: Type.String(),
+	options: Type.Optional(Type.Array(Option)),
+	attributes: Type.Optional(Type.Array(Attribute)),
+});
+
 export type LocalVariable = Static<typeof LocalVariable>;
 export const LocalVariable = Type.Object({
 	type: Type.Literal("local-variable"),
@@ -56,4 +86,6 @@ export type Declaration = Static<typeof Declaration>;
 export const Declaration = Type.Union([InputVariable, LocalVariable]);
 
 export type Pattern = Static<typeof Pattern>;
-export const Pattern = Type.Array(Type.Union([Text, Expression]));
+export const Pattern = Type.Array(
+	Type.Union([Text, Expression, MarkupStart, MarkupEnd, MarkupStandalone])
+);

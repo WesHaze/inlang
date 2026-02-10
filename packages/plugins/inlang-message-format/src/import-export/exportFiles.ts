@@ -132,12 +132,45 @@ function serializePattern(pattern: Variant["pattern"]): string {
 	let result = "";
 
 	for (const part of pattern) {
-		if (part.type === "text") {
-			result += escapePatternText(part.value);
-		} else if (part.arg.type === "variable-reference") {
-			result += `{${part.arg.name}}`;
-		} else {
-			throw new Error("Unsupported expression type");
+		switch (part.type) {
+			case "text":
+				result += escapePatternText(part.value);
+				break;
+			case "expression":
+				if (part.arg.type === "variable-reference") {
+					result += `{${part.arg.name}}`;
+					break;
+				}
+				throw new Error("Unsupported expression type");
+			case "markup-start":
+				result += serializeMarkup(
+					"#",
+					part.name,
+					part.options,
+					part.attributes,
+					false
+				);
+				break;
+			case "markup-end":
+				result += serializeMarkup(
+					"/",
+					part.name,
+					part.options,
+					part.attributes,
+					false
+				);
+				break;
+			case "markup-standalone":
+				result += serializeMarkup(
+					"#",
+					part.name,
+					part.options,
+					part.attributes,
+					true
+				);
+				break;
+			default:
+				throw new Error("Unsupported pattern element type");
 		}
 	}
 	return result;
@@ -145,6 +178,51 @@ function serializePattern(pattern: Variant["pattern"]): string {
 
 function escapePatternText(value: string): string {
 	return value.replace(/\\/g, "\\\\").replace(/{/g, "\\{").replace(/}/g, "\\}");
+}
+
+function serializeMarkup(
+	prefix: "#" | "/",
+	name: string,
+	options:
+		| Array<{
+				name: string;
+				value: { type: "literal"; value: string } | { type: "variable-reference"; name: string };
+		  }>
+		| undefined,
+	attributes:
+		| Array<{
+				name: string;
+				value: { type: "literal"; value: string } | true;
+		  }>
+		| undefined,
+	standalone: boolean
+): string {
+	const serializedOptions = (options ?? []).map((option) => {
+		if (option.value.type === "variable-reference") {
+			return `${option.name}=$${option.value.name}`;
+		}
+		return `${option.name}=|${escapeMarkupLiteral(option.value.value)}|`;
+	});
+
+	const serializedAttributes = (attributes ?? []).map((attribute) => {
+		if (attribute.value === true) {
+			return `@${attribute.name}`;
+		}
+		return `@${attribute.name}=|${escapeMarkupLiteral(attribute.value.value)}|`;
+	});
+
+	const metadata = [...serializedOptions, ...serializedAttributes].join(" ");
+	if (metadata.length === 0) {
+		return standalone ? `{${prefix}${name}/}` : `{${prefix}${name}}`;
+	}
+	if (standalone) {
+		return `{${prefix}${name} ${metadata}/}`;
+	}
+	return `{${prefix}${name} ${metadata}}`;
+}
+
+function escapeMarkupLiteral(value: string): string {
+	return value.replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/}/g, "\\}");
 }
 
 // input: { platform: "android", userGender: "male" }

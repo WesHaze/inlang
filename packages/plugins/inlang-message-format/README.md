@@ -192,6 +192,61 @@ When addressing nested messages, use dot notation (e.g. `navigation.items.count`
 > [!NOTE]
 > The array wrapper is how we distinguish between a nested object containing more messages vs. a complex message object with variants.
 
+### Markup Placeholders (Rich Text)
+
+Simple message patterns can include markup placeholders for rich rendering.
+
+- Open + close markup: `{#tag}...{/tag}`
+- Standalone markup: `{#icon/}`
+
+```json
+{
+	"welcome": "{#b}Hi {name}{/b}{#icon/}"
+}
+```
+
+#### Markup options
+
+Markup options are key/value pairs written after the markup name:
+
+- Literal option value: `key=|literal|`
+- Variable option value: `key=$variable`
+
+```json
+{
+	"cta": "{#link to=|/docs| rel=$relationship}Read docs{/link}"
+}
+```
+
+In the example above, `to` is a literal option and `rel` reads from the input variable `relationship`.
+
+#### Markup attributes
+
+Markup attributes are metadata prefixed with `@`:
+
+- Presence attribute (boolean `true`): `@track`
+- Literal-valued attribute: `@variant=|hero|`
+
+```json
+{
+	"banner": "{#cta @track @variant=|hero|}Try now{/cta}"
+}
+```
+
+#### Quoted literal syntax (`|...|`)
+
+Use `|...|` when you want an explicit literal value in markup options/attributes.
+Inside quoted literals:
+
+- Escape `|` as `\|`
+- Escape `\` as `\\`
+
+```json
+{
+	"icon": "{#icon name=|pipe\\|value| path=|C:\\\\icons\\\\ok| @decorative/}"
+}
+```
+
 ### Escaping Special Characters
 
 Since curly braces `{` and `}` are used to denote variables, you need to escape them if you want to include literal braces in your message text. Use a backslash to escape:

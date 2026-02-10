@@ -136,27 +136,49 @@ function serializePattern(pattern: Pattern, settings?: PluginSettings): string {
 	let result = "";
 
 	const variableRefPattern = settings?.variableReferencePattern ?? ["{{", "}}"];
+	const usesAngleBracketVariablePattern =
+		variableRefPattern[0] === "<" && variableRefPattern[1] === ">";
+
+	if (
+		usesAngleBracketVariablePattern &&
+		pattern.some(
+			(part) =>
+				part.type === "markup-start" ||
+				part.type === "markup-end" ||
+				part.type === "markup-standalone"
+		)
+	) {
+		throw new Error(
+			"Cannot serialize markup when variableReferencePattern is '<' and '>' because both syntaxes would conflict."
+		);
+	}
 
 	for (const part of pattern) {
-		if (part.type === "text") {
-			result += part.value;
-		} else if (
-			part.arg.type === "variable-reference" &&
-			part.annotation === undefined
-		) {
-			result += `${variableRefPattern[0]}${part.arg.name}${variableRefPattern[1]}`;
-		} else if (
-			part.arg.type === "variable-reference" &&
-			part.annotation !== undefined &&
-			part.annotation.options.length === 0
-		) {
-			result += `${variableRefPattern[0]}${part.arg.name}, ${part.annotation.name}${variableRefPattern[1]}`;
-		} else if (
-			part.arg.type === "variable-reference" &&
-			part.annotation !== undefined &&
-			part.annotation.options.length > 0
-		) {
-			throw new Error("Not implemented");
+		switch (part.type) {
+			case "text":
+				result += part.value;
+				break;
+			case "expression":
+				if (part.arg.type !== "variable-reference") {
+					throw new Error("Only variable references are supported.");
+				}
+				if (part.annotation === undefined) {
+					result += `${variableRefPattern[0]}${part.arg.name}${variableRefPattern[1]}`;
+				} else if (part.annotation.options.length === 0) {
+					result += `${variableRefPattern[0]}${part.arg.name}, ${part.annotation.name}${variableRefPattern[1]}`;
+				} else {
+					throw new Error("Not implemented");
+				}
+				break;
+			case "markup-start":
+				result += `<${part.name}>`;
+				break;
+			case "markup-end":
+				result += `</${part.name}>`;
+				break;
+			case "markup-standalone":
+				result += `<${part.name}/>`;
+				break;
 		}
 	}
 
