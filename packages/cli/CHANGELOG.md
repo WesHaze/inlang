@@ -1,5 +1,13 @@
 # @inlang/cli
 
+## 3.1.6
+
+### Patch Changes
+
+- b8d0b20: Fix CLI commands not terminating by removing the shutdown wait on `fileQueueSettled`.
+
+  Also silence known non-actionable shutdown noise from background file queue processing when the DB is already closed.
+
 ## 3.1.5
 
 ### Patch Changes
