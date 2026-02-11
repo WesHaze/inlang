@@ -1,8 +1,5 @@
 import { Command } from "commander";
-import {
-  getInlangProject,
-  settleLastUsedProjectFileQueue,
-} from "../../utilities/getInlangProject.js";
+import { getInlangProject } from "../../utilities/getInlangProject.js";
 import { log } from "../../utilities/log.js";
 import { projectOption } from "../../utilities/globalFlags.js";
 
@@ -32,7 +29,6 @@ export async function validateCommandAction(args: { project: string }) {
     log.error(error);
     exitCode = 1;
   } finally {
-    await settleLastUsedProjectFileQueue();
     process.exit(exitCode);
   }
 }
