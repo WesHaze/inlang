@@ -3,6 +3,7 @@ import { machine } from "./commands/machine/index.js";
 import { plugin } from "./commands/plugin/index.js";
 import { version } from "../package.json";
 import { initErrorMonitoring } from "./services/error-monitoring/implementation.js";
+import { silenceKnownShutdownNoise } from "./services/error-monitoring/silenceKnownShutdownNoise.js";
 import { validate } from "./commands/validate/index.js";
 import { capture } from "./telemetry/capture.js";
 import { lastUsedProject } from "./utilities/getInlangProject.js";
@@ -11,6 +12,7 @@ import { lint } from "./commands/lint/index.js";
 // --------------- INIT ---------------
 
 initErrorMonitoring();
+silenceKnownShutdownNoise();
 // checks whether the gitOrigin corresponds to the pattern
 
 // beautiful logging

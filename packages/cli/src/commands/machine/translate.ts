@@ -1,10 +1,7 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { Command } from "commander";
 import { rpc } from "@inlang/rpc";
-import {
-  getInlangProject,
-  settleLastUsedProjectFileQueue,
-} from "../../utilities/getInlangProject.js";
+import { getInlangProject } from "../../utilities/getInlangProject.js";
 import { log, logError } from "../../utilities/log.js";
 import {
   saveProjectToDirectory,
@@ -41,7 +38,6 @@ export const translate = new Command()
       logError(error);
       exitCode = 1;
     } finally {
-      await settleLastUsedProjectFileQueue();
       process.exit(exitCode);
     }
   });
