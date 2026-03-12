@@ -122,7 +122,7 @@ function App() {
                 href="https://www.npmjs.com/package/@inlang/sdk"
                 target="_blank"
                 rel="noopener noreferrer"
-                aria-label="130k+ weekly npm downloads - view package"
+                aria-label="200k+ weekly npm downloads - view package"
                 className="group"
               >
                 <div className="flex items-center gap-2 text-2xl font-semibold text-slate-900 group-hover:text-slate-700">
@@ -133,7 +133,7 @@ function App() {
                   >
                     <path d="M1.763 0C.786 0 0 .786 0 1.763v20.474C0 23.214.786 24 1.763 24h20.474c.977 0 1.763-.786 1.763-1.763V1.763C24 .786 23.214 0 22.237 0zM5.13 5.323l13.837.019-.009 13.836h-3.464l.01-10.382h-3.456L12.04 19.17H5.113z" />
                   </svg>
-                  130k+
+                  200k+
                 </div>
                 <div className="text-sm text-slate-500">weekly downloads</div>
               </a>
