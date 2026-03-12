@@ -2,9 +2,6 @@ import fs from "node:fs";
 import { loadProjectFromDirectory, type InlangProject } from "@inlang/sdk";
 import { resolve } from "node:path";
 
-/**
- * Used for telemetry.
- */
 export let lastUsedProject: InlangProject | undefined;
 
 /**
@@ -20,7 +17,6 @@ export async function getInlangProject(args: {
     const project = await loadProjectFromDirectory({
       path: projectPath,
       fs: fs,
-      appId: "app",
     });
 
     lastUsedProject = project;

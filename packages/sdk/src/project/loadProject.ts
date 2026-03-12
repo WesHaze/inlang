@@ -13,7 +13,6 @@ import {
 import type { InlangProject } from "./api.js";
 import { withLanguageTagToLocaleMigration } from "../migrations/v2/withLanguageTagToLocaleMigration.js";
 import { v4 } from "uuid";
-import { maybeCaptureLoadedProject } from "./maybeCaptureTelemetry.js";
 import { importFiles } from "../import-export/importFiles.js";
 import { exportFiles } from "../import-export/exportFiles.js";
 
@@ -54,15 +53,6 @@ export async function loadProject(args: {
 	 *
 	 */
 	preprocessPluginBeforeImport?: PreprocessPluginBeforeImportFunction;
-	/**
-	 * The id of the app that is using the SDK.
-	 *
-	 * The is used for telemetry purposes. To derive insights like
-	 * which app is using the SDK, how many projects are loaded, etc.
-	 *
-	 * The app id can be removed at any time in the future
-	 */
-	appId?: string;
 }): Promise<InlangProject> {
 	const db = initDb({ sqlite: args.sqlite });
 
@@ -86,28 +76,10 @@ export async function loadProject(args: {
 
 	const plugins = [...(args.providePlugins ?? []), ...importedPlugins.plugins];
 
-	const idFile = await args.lix.db
-		.selectFrom("file")
-		.where("path", "=", "/project_id")
-		.select("data")
-		.executeTakeFirstOrThrow();
-
-	const id = new TextDecoder().decode(idFile.data);
-
 	// const state = createProjectState({
 	// 	...args,
 	// 	settings,
 	// });
-
-	// not awaiting to not block the load time of a project
-	maybeCaptureLoadedProject({
-		db,
-		id,
-		settings,
-		plugins,
-		lix: args.lix,
-		appId: args.appId,
-	});
 
 	return {
 		db,
