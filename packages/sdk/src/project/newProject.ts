@@ -23,12 +23,7 @@ export async function newProject(args?: {
 	try {
 		const inlangDbContent = contentFromDatabase(sqlite);
 
-		const lix = await openLixInMemory({
-			blob: await newLixFile(),
-			keyValues: [
-				{ key: "lix_telemetry", value: args?.settings?.telemetry ?? "on" },
-			],
-		});
+		const lix = await openLixInMemory({ blob: await newLixFile() });
 
 		const { value: lixId } = await lix.db
 			.selectFrom("key_value")

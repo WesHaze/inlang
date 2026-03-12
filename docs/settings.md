@@ -15,7 +15,6 @@ type ProjectSettings = {
   baseLocale: string;
   locales: string[];
   modules?: string[];
-  telemetry?: "off";
   experimental?: Record<string, true>;
 }
 ```
@@ -63,16 +62,6 @@ URIs to plugin modules. Plugins extend inlang with import/export capabilities fo
 - Must be valid URIs (RFC 3986)
 - Must end with `.js`
 - Can be absolute (CDN) or relative paths
-
-### telemetry
-
-Controls anonymous usage telemetry. Omit for default behavior, or set to `"off"` to disable.
-
-```json
-{
-  "telemetry": "off"
-}
-```
 
 ### experimental
 
