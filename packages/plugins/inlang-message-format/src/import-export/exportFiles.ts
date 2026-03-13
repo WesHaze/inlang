@@ -254,10 +254,15 @@ function serializeDeclaration(declaration: Declaration): string {
 		}
 		if (declaration.value.annotation?.options) {
 			for (const option of declaration.value?.annotation?.options ?? []) {
-				if (option.value.type !== "literal") {
-					throw new Error("Unsupported option type");
+				if (option.value.type === "literal") {
+					result += ` ${option.name}=${option.value.value}`;
+					continue;
 				}
-				result += ` ${option.name}=${option.value.value}`;
+				if (option.value.type === "variable-reference") {
+					result += ` ${option.name}=$${option.value.name}`;
+					continue;
+				}
+				throw new Error("Unsupported option type");
 			}
 		}
 		return result;

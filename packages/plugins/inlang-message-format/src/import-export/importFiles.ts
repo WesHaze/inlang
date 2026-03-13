@@ -534,23 +534,37 @@ function parseDeclaration(value: string): Declaration {
 	else if (value.startsWith("local")) {
 		const match = value.match(/local (\w+) = (\w+): (\w+)(.*)/);
 		const [, name, ref, fn, optionsString] = match!;
-		// TODO handle variable reference options
-		const options = optionsString
-			?.trim()
-			.split(/\s+/)
-			.map((pair) => {
-				const [key, value] = pair.split("=");
-				return key && value
-					? {
-							name: key,
-							value: { type: "literal", value },
-						}
-					: null;
-			})
-			.filter(Boolean) as {
+		const options: {
 			name: string;
-			value: { type: "literal"; value: string };
-		}[];
+			value:
+				| { type: "literal"; value: string }
+				| { type: "variable-reference"; name: string };
+		}[] = [];
+
+		for (const optionMatch of (optionsString ?? "").matchAll(
+			/(\w+)\s*=\s*([^\s]+)/g
+		)) {
+			const optionName = optionMatch[1];
+			const optionValue = optionMatch[2];
+
+			if (!optionName || !optionValue) {
+				continue;
+			}
+
+			options.push({
+				name: optionName,
+				value:
+					optionValue.startsWith("$") && optionValue.length > 1
+						? {
+								type: "variable-reference",
+								name: optionValue.slice(1),
+							}
+						: {
+								type: "literal",
+								value: optionValue,
+							},
+			});
+		}
 
 		return {
 			type: "local-variable",

@@ -562,6 +562,113 @@ test("local variables with function declarations and options", async () => {
 	});
 });
 
+test("local variables support whitespace around literal formatter options", async () => {
+	const imported = await runImportFiles({
+		some_happy_cat: [
+			{
+				declarations: [
+					"input date",
+					"local formattedDate = date: datetime month = long day = numeric",
+				],
+				selectors: [],
+				match: {
+					"formattedDate=*": "Today is {formattedDate}.",
+				},
+			},
+		],
+	});
+
+	expect(await runExportFilesParsed(imported)).toMatchObject({
+		some_happy_cat: [
+			{
+				declarations: [
+					"input date",
+					"local formattedDate = date: datetime month=long day=numeric",
+				],
+				selectors: ["formattedDate"],
+				match: {
+					"formattedDate=*": "Today is {formattedDate}.",
+				},
+			},
+		],
+	});
+
+	expect(imported.bundles[0]?.declarations).toContainEqual({
+		type: "local-variable",
+		name: "formattedDate",
+		value: {
+			type: "expression",
+			arg: { type: "variable-reference", name: "date" },
+			annotation: {
+				type: "function-reference",
+				name: "datetime",
+				options: [
+					{ name: "month", value: { type: "literal", value: "long" } },
+					{ name: "day", value: { type: "literal", value: "numeric" } },
+				],
+			},
+		},
+	});
+});
+
+test("local variables support variable references in formatter options", async () => {
+	const imported = await runImportFiles({
+		pricing_card_price_display: [
+			{
+				declarations: [
+					"input amount",
+					"input priceCurrency",
+					"local formattedAmount = amount: number style = currency currency = $priceCurrency notation = compact",
+				],
+				selectors: [],
+				match: {
+					"formattedAmount=*": "{formattedAmount}",
+				},
+			},
+		],
+	});
+
+	expect(await runExportFilesParsed(imported)).toMatchObject({
+		pricing_card_price_display: [
+			{
+				declarations: [
+					"input amount",
+					"input priceCurrency",
+					"local formattedAmount = amount: number style=currency currency=$priceCurrency notation=compact",
+				],
+				selectors: ["formattedAmount"],
+				match: {
+					"formattedAmount=*": "{formattedAmount}",
+				},
+			},
+		],
+	});
+
+	expect(imported.bundles[0]?.declarations).toContainEqual({
+		type: "local-variable",
+		name: "formattedAmount",
+		value: {
+			type: "expression",
+			arg: { type: "variable-reference", name: "amount" },
+			annotation: {
+				type: "function-reference",
+				name: "number",
+				options: [
+					{ name: "style", value: { type: "literal", value: "currency" } },
+					{
+						name: "currency",
+						value: {
+							type: "variable-reference",
+							name: "priceCurrency",
+						},
+					},
+					{ name: "notation", value: { type: "literal", value: "compact" } },
+				],
+			},
+		},
+	});
+});
+
 test("turns string syntax into ", async () => {
 	const imported = await runImportFiles({
 		some_happy_cat: [

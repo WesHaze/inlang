@@ -220,6 +220,26 @@ Markup options are key/value pairs written after the markup name:
 
 In the example above, `to` is a literal option and `rel` reads from the input variable `relationship`.
 
+The same `$variable` syntax is also supported in local formatter declarations.
+Whitespace around `=` is optional in declaration options.
+
+```json
+{
+	"pricing_card_price_display": [
+		{
+			"declarations": [
+				"input amount",
+				"input priceCurrency",
+				"local formattedAmount = amount: number style=currency currency=$priceCurrency notation=compact"
+			],
+			"match": {
+				"formattedAmount=*": "{formattedAmount}"
+			}
+		}
+	]
+}
+```
+
 #### Markup attributes
 
 Markup attributes are metadata prefixed with `@`:
