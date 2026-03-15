@@ -4,7 +4,7 @@
   <img src="https://github.com/opral/inlang/blob/main/assets/logo_rounded.png?raw=true" alt="inlang icon" width="90px">
   
   <h2 align="center">
-    The open file format for localization (i18n) tools.
+    The open project format for localization tooling.
   </h2>
 
   <p align="center">
@@ -21,11 +21,24 @@
 
 <br>
 
+Inlang is an open project format and SDK for localization tooling.
+
+It is not a new message syntax or a SaaS translation backend. It gives editors, CLIs, IDE extensions, and runtimes a shared, queryable source of truth for localization data.
+
+You can keep using your existing translation files and message syntax. Plugins connect inlang to formats like JSON, ICU MessageFormat v1, i18next, and XLIFF.
+
 ## The problem
 
-i18n tools are not interoperable.
+Translation files are great for applications. They are a weak foundation for tooling.
 
-No common file format for i18n tools exists. Data formats like JSON or YAML are unsuited for complex tools that need CRUD APIs, need to scale to hundreds of thousands of messages, or require version control.
+Once multiple tools need to work on the same project, you usually want more than key-value files:
+
+- Structured reads and writes instead of ad-hoc parsing
+- Queries across locales and message variants
+- Reliable history, merging, and collaboration
+- One source of truth that editors, CI, and runtimes can all share
+
+Without a common substrate, every tool invents its own format, sync, and collaboration model.
 
 The result is fragmented tooling:
 
@@ -44,12 +57,12 @@ Every tool has its own format, its own sync, its own collaboration layer. Cross-
 
 ## The solution
 
-Inlang is an open file format designed for building localization (i18n) tooling. It provides:
+Inlang is a shared project format for localization tools while keeping your external file formats. It provides:
 
-- CRUD API — Read and write translations programmatically
-- SQL queries — Query messages like a database, scale to millions
-- Plugin system — Import/export any format (JSON, XLIFF, etc.)
-- Version control — Built-in version control via [lix](https://github.com/opral/lix)
+- A message-first data model and SDK for structured reads and writes
+- Queryable storage for translations, settings, and edits
+- Plugins to import/export formats like JSON, ICU1, i18next, and XLIFF
+- Versioning and collaboration primitives via [lix](https://github.com/opral/lix)
 
 
 ```
@@ -70,7 +83,10 @@ The result:
 - Switch tools without migrations — they all use the same file
 - Cross-team work without hand-offs — developers, translators, and designers all edit the same source
 - Automation just works — one source of truth, no glue code
-- 
+- Keep your preferred message format — plugins handle import/export
+
+If you only need an app runtime and a couple of translation files, your current setup may already be enough. Inlang becomes useful when multiple tools need to operate on the same localization source of truth.
+
 ## Popular tools
 
 - [Paraglide](https://inlang.com/m/gerre34r/library-inlang-paraglideJs) — i18n library for JS/TS with fully translated, typesafe & fast apps in minutes

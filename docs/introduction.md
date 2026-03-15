@@ -2,16 +2,29 @@
 
 ## What is inlang?
 
-Inlang is an open file format and SDK for localization (i18n) that enables interoperability between tools. Instead of being locked into one translation management system, inlang provides a universal `.inlang` file format that any tool can read and write.
+Inlang is an open project format and SDK for localization tooling.
 
-The SDK consists of two main parts:
+It is not a new message syntax or a SaaS translation backend. Instead, it gives editors, CLIs, IDE extensions, and runtimes a shared, queryable source of truth for localization data.
 
-- **A file format** that stores translations in a portable SQLite database with built-in version control
-- **An API** for loading, querying, and modifying translations programmatically
+You can keep using your existing translation files and message syntax. Plugins connect inlang to formats like JSON, ICU MessageFormat v1, i18next, and XLIFF.
+
+The SDK has two main parts:
+
+- **Storage + data model** for translations, settings, and structured edits
+- **An API** for loading, querying, and modifying that data programmatically
 
 ## Why inlang?
 
-i18n tools are not interoperable. No common file format exists. Data formats like JSON or YAML are unsuited for complex tools that need CRUD APIs, need to scale to hundreds of thousands of messages, or require version control.
+Translation files are great for applications. They are a weak foundation for tooling.
+
+Once multiple tools need to work on the same project, you usually want more than key-value files:
+
+- Structured reads and writes instead of ad-hoc parsing
+- Queries across locales and message variants
+- Reliable history, merging, and collaboration
+- One source of truth that editors, CI, and runtimes can all share
+
+Without a common substrate, every tool invents its own format, sync, and collaboration model.
 
 The result is fragmented tooling:
 
@@ -26,7 +39,7 @@ The result is fragmented tooling:
 └──────────┘        └───────────┘         └──────────┘
 ```
 
-Inlang follows Unix philosophy: **one file format, multiple tools, all interoperable**.
+Inlang follows a simple idea: **one shared project format for localization tools, while keeping your external file formats**.
 
 ```
 ┌──────────┐        ┌───────────┐         ┌────────────┐
@@ -46,10 +59,13 @@ Inlang follows Unix philosophy: **one file format, multiple tools, all interoper
 - Switch tools without migrations — they all use the same file
 - Cross-team work without hand-offs — developers, translators, and designers all edit the same source
 - Automation just works — one source of truth, no glue code
+- Keep your preferred message format — plugins handle import/export
 
 ## How it works
 
-An `.inlang` file is a SQLite database with built-in version control via Lix. That's it — one portable file containing all your translations.
+Under the hood, an inlang project stores localization data in SQLite and uses a message-first data model.
+
+Lix adds history and sync semantics on top, and plugins map that data to the files you already use.
 
 ```
 ┌─────────────────┐       ┌─────────┐       ┌──────────────────┐
@@ -58,7 +74,11 @@ An `.inlang` file is a SQLite database with built-in version control via Lix. Th
 └─────────────────┘       └─────────┘       └──────────────────┘
 ```
 
-Plugins handle the import/export between your source files (JSON, i18next, XLIFF, etc.) and the inlang database. You can keep your existing file structure — plugins sync changes bidirectionally.
+- **Plugins** import and export your translation files (`JSON`, `ICU1`, `i18next`, `XLIFF`, etc.)
+- **inlang** stores the data in a queryable project format
+- **Lix** provides versioning and collaboration primitives for distributed changes
+
+If you only need an app runtime and a couple of translation files, your current setup may already be enough. Inlang becomes useful when multiple tools need to operate on the same localization source of truth.
 
 To store an inlang project in git, you can use the **unpacked format** — a directory instead of a single file. See [Unpacked Project](/docs/unpacked-project) for details.
 
@@ -72,4 +92,3 @@ To store an inlang project in git, you can use the **unpacked format** — a dir
 ## Credits
 
 Inlang builds on [Lix](https://lix.dev) for version control and [Kysely](https://kysely.dev) for the query API.
-
