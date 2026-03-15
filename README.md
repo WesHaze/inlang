@@ -29,16 +29,18 @@ You can keep using your existing translation files and message syntax. Plugins c
 
 ## The problem
 
-Translation files are great for applications. They are a weak foundation for tooling.
+Common translation files like JSON, YAML, ICU, or XLIFF are good at serializing messages. But they are not databases.
 
-Once multiple tools need to work on the same project, you usually want more than key-value files:
+Once multiple tools need to read and write the same project, missing database semantics become the bottleneck:
 
-- Structured reads and writes instead of ad-hoc parsing
-- Queries across locales and message variants
-- Reliable history, merging, and collaboration
+- Structured CRUD operations instead of ad-hoc parsing
+- Queries across locales, variants, and metadata
+- Transactions, history, merging, and collaboration
 - One source of truth that editors, CI, and runtimes can all share
 
 Without a common substrate, every tool invents its own format, sync, and collaboration model.
+
+Even basic import/export for translation file formats gets duplicated across tools instead of being shared.
 
 The result is fragmented tooling:
 
@@ -57,11 +59,11 @@ Every tool has its own format, its own sync, its own collaboration layer. Cross-
 
 ## The solution
 
-Inlang is a shared project format for localization tools while keeping your external file formats. It provides:
+Inlang adds those database semantics in a shared project format while keeping your external file formats. It provides:
 
 - A message-first data model and SDK for structured reads and writes
 - Queryable storage for translations, settings, and edits
-- Plugins to import/export formats like JSON, ICU1, i18next, and XLIFF
+- Plugins to import/export formats like JSON, ICU1, i18next, and XLIFF so that file-format support can be shared instead of reimplemented in every tool
 - Versioning and collaboration primitives via [lix](https://github.com/opral/lix)
 
 

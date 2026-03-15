@@ -15,13 +15,13 @@ The SDK has two main parts:
 
 ## Why inlang?
 
-Translation files are great for applications. They are a weak foundation for tooling.
+Common translation files like JSON, YAML, ICU, or XLIFF are good at serializing messages. But they are not databases.
 
-Once multiple tools need to work on the same project, you usually want more than key-value files:
+Once multiple tools need to read and write the same project, missing database semantics become the bottleneck:
 
-- Structured reads and writes instead of ad-hoc parsing
-- Queries across locales and message variants
-- Reliable history, merging, and collaboration
+- Structured CRUD operations instead of ad-hoc parsing
+- Queries across locales, variants, and metadata
+- Transactions, history, merging, and collaboration
 - One source of truth that editors, CI, and runtimes can all share
 
 Without a common substrate, every tool invents its own format, sync, and collaboration model.
