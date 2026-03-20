@@ -1,5 +1,5 @@
 ---
-"@inlang/sdk": major
+"@inlang/sdk": minor
 ---
 
 Update `@lix-js/sdk` to `0.4.8`, bump `kysely` to `^0.28.12`, and raise the advertised Node.js support range to `>=20.0.0` to match the updated dependency requirements.
