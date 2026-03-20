@@ -1,5 +1,12 @@
 # @inlang/rpc
 
+## 0.3.59
+
+### Patch Changes
+
+- Updated dependencies [bcd4335]
+  - @inlang/sdk@2.9.1
+
 ## 0.3.58
 
 ### Patch Changes

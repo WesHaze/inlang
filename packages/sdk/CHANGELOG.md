@@ -1,5 +1,11 @@
 # @inlang/sdk
 
+## 2.9.1
+
+### Patch Changes
+
+- bcd4335: Update `@lix-js/sdk` to `0.4.9` and remove the noisy deprecated Kysely `orderBy("... asc|desc")` usage from the SDK path.
+
 ## 2.9.0
 
 ### Minor Changes

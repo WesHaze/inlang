@@ -1,5 +1,12 @@
 # @inlang/cli
 
+## 3.1.9
+
+### Patch Changes
+
+- Updated dependencies [bcd4335]
+  - @inlang/sdk@2.9.1
+
 ## 3.1.8
 
 ### Patch Changes

@@ -1,5 +1,12 @@
 # @inlang/message-bundle-component
 
+## 9.0.1
+
+### Patch Changes
+
+- Updated dependencies [bcd4335]
+  - @inlang/sdk@2.9.1
+
 ## 9.0.0
 
 ### Patch Changes
