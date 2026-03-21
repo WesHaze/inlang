@@ -182,45 +182,46 @@ runIf("llmTranslateBundle (integration)", () => {
     ).toBe("Opslaan");
   }, 5_000);
 
-  it("returns error when no API key is provided", async () => {
-    const project = await loadProjectInMemory({
-      blob: await newProject({
-        settings: { baseLocale: "en-gb", locales: ["en-gb", "nl"] },
-      }),
-    });
+});
 
-    await insertBundleNested(project.db, {
-      id: "test",
-      messages: [
-        {
-          id: "test_en",
-          bundleId: "test",
-          locale: "en-gb",
-          variants: [
-            {
-              id: "test_en_v",
-              messageId: "test_en",
-              pattern: [{ type: "text", value: "Test" }],
-            },
-          ],
-        },
-      ],
-    });
-
-    const [bundle] = await selectBundleNested(project.db).execute();
-    // Explicitly pass undefined API key and ensure env var is not set
-    const savedKey = process.env.OPENROUTER_API_KEY;
-    delete process.env.OPENROUTER_API_KEY;
-
-    const result = await llmTranslateBundle({
-      bundle: bundle!,
-      sourceLocale: "en-gb",
-      targetLocales: ["nl"],
-      openrouterApiKey: undefined,
-      model: "openai/gpt-4o-mini",
-    });
-
-    process.env.OPENROUTER_API_KEY = savedKey;
-    expect(result.error).toMatch(/OPENROUTER_API_KEY/);
+// Unit test — runs unconditionally, no API key required
+it("returns error when no API key is provided", async () => {
+  const project = await loadProjectInMemory({
+    blob: await newProject({
+      settings: { baseLocale: "en-gb", locales: ["en-gb", "nl"] },
+    }),
   });
+
+  await insertBundleNested(project.db, {
+    id: "test",
+    messages: [
+      {
+        id: "test_en",
+        bundleId: "test",
+        locale: "en-gb",
+        variants: [
+          {
+            id: "test_en_v",
+            messageId: "test_en",
+            pattern: [{ type: "text", value: "Test" }],
+          },
+        ],
+      },
+    ],
+  });
+
+  const [bundle] = await selectBundleNested(project.db).execute();
+  const savedKey = process.env.OPENROUTER_API_KEY;
+  delete process.env.OPENROUTER_API_KEY;
+
+  const result = await llmTranslateBundle({
+    bundle: bundle!,
+    sourceLocale: "en-gb",
+    targetLocales: ["nl"],
+    openrouterApiKey: undefined,
+    model: "openai/gpt-4o-mini",
+  });
+
+  process.env.OPENROUTER_API_KEY = savedKey;
+  expect(result.error).toMatch(/OPENROUTER_API_KEY/);
 });
