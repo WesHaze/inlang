@@ -52,6 +52,7 @@ if (!dryRun && !apiKey) {
 type BenchmarkRecord = {
   runId: string;
   timestamp: string;
+  command: string;
   model: string;
   strategy: "multi-locale" | "per-locale";
   batchSize: number;
@@ -229,6 +230,7 @@ async function runExperiment(
       const record: BenchmarkRecord = {
         runId,
         timestamp: new Date().toISOString(),
+        command: `npx tsx benchmark.ts ${args.join(" ")}`,
         model: MODEL,
         strategy,
         batchSize,
