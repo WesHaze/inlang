@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "benchmark": "npx tsx benchmark.ts"
+    "benchmark": "npx tsx --env-file=.env benchmark.ts"
   },
   "dependencies": {
     "@inlang/sdk": "workspace:*"
