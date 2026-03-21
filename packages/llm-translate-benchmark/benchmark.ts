@@ -38,7 +38,7 @@ const dryRun = args.includes("--dry-run");
 const BATCH_SIZES = batchSizesArg.split(",").map(Number);
 const STRATEGIES: Array<"multi-locale" | "per-locale"> = ["multi-locale", "per-locale"];
 const SOURCE_LOCALE = "en-gb";
-const TARGET_LOCALES = ["nl"];
+const TARGET_LOCALES = ["nl", "de", "fr", "es"];
 const MODEL = modelArg;
 
 const apiKey = process.env.OPENROUTER_API_KEY;
