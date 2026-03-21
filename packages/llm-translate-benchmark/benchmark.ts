@@ -61,10 +61,7 @@ const apiKey = "sk-or-v1-89b0861ccd57aa92dcb2093d2f63da37ab8c1deed5369b6db7f798e
 type KeyTranslation = {
   keyId: string;
   source: string;                        // text nodes joined — human-readable
-  locales: Record<string, {
-    text: string;                        // translated text nodes joined
-    valid: boolean;
-  }>;
+  locales: Record<string, string>;       // locale → translated text nodes joined
 };
 
 type BenchmarkRecord = {
@@ -81,8 +78,6 @@ type BenchmarkRecord = {
   cachedTokens: number;
   thinkingTokens: number;
   totalTokens: number;
-  successCount: number;
-  rejectedCount: number;
   durationMs: number;
   keys: KeyTranslation[];
 };
@@ -155,19 +150,6 @@ function patternToText(pattern: unknown): string {
     .filter((n) => n["type"] === "text")
     .map((n) => String(n["value"] ?? ""))
     .join("");
-}
-
-function validatePattern(source: unknown[], translated: unknown): boolean {
-  if (!Array.isArray(translated)) return false;
-  if (translated.length !== source.length) return false;
-  for (let i = 0; i < source.length; i++) {
-    const src = source[i] as Record<string, unknown>;
-    const tgt = translated[i] as Record<string, unknown>;
-    if (src["type"] !== "text") {
-      if (JSON.stringify(src) !== JSON.stringify(tgt)) return false;
-    }
-  }
-  return true;
 }
 
 // ── Experiment runner ─────────────────────────────────────────────────────
@@ -243,16 +225,11 @@ async function runExperiment(
       }
       const durationMs = Date.now() - start;
 
-      // Validate response
-      let successCount = 0;
-      let rejectedCount = 0;
-
-      let translations: Record<string, Record<string, unknown[]>> = {};
+      let translations: Record<string, Record<string, unknown>> = {};
       try {
         translations = JSON.parse(result.content);
       } catch {
         console.warn("  [WARN] Failed to parse LLM response as JSON");
-        rejectedCount = chunk.length * locales.length;
       }
 
       const keyTranslations: KeyTranslation[] = [];
@@ -270,15 +247,7 @@ async function runExperiment(
         };
 
         for (const locale of locales) {
-          const translated = translations?.[bundle.id]?.[locale];
-          const valid = validatePattern(srcVariant.pattern as unknown[], translated);
-          keyEntry.locales[locale] = { text: patternToText(translated), valid };
-          if (valid) {
-            successCount++;
-          } else {
-            rejectedCount++;
-            console.warn(`  [WARN] Validation failed: ${bundle.id} → ${locale}`);
-          }
+          keyEntry.locales[locale] = patternToText(translations?.[bundle.id]?.[locale]);
         }
 
         keyTranslations.push(keyEntry);
@@ -298,15 +267,13 @@ async function runExperiment(
         cachedTokens: result.cachedTokens,
         thinkingTokens: result.thinkingTokens,
         totalTokens: result.totalTokens,
-        successCount,
-        rejectedCount,
         durationMs,
         keys: keyTranslations,
       };
 
       chunkRecords.push(record);
       console.log(
-        `  [${strategy}] batchSize=${batchSize} keys=${chunk.length} locales=${locales.join(",")} tokens=${result.totalTokens} success=${successCount} rejected=${rejectedCount} ms=${durationMs}`,
+        `  [${strategy}] batchSize=${batchSize} keys=${chunk.length} locales=${locales.join(",")} tokens=${result.totalTokens} ms=${durationMs}`,
       );
     }
     return chunkRecords;
@@ -393,9 +360,7 @@ async function main(): Promise<void> {
 
     // Summary by batchSize + strategy
     console.log("\n── Summary ──");
-    console.log(
-      `${"Strategy".padEnd(15)} ${"BatchSize".padEnd(10)} ${"AvgTokens".padEnd(12)} ${"AvgSuccess".padEnd(12)} ${"AvgRejected"}`,
-    );
+    console.log(`${"Strategy".padEnd(15)} ${"BatchSize".padEnd(10)} ${"AvgTokens".padEnd(12)} ${"Calls"}`);
     const grouped = new Map<string, BenchmarkRecord[]>();
     for (const r of newRecords) {
       const key = `${r.strategy}::${r.batchSize}`;
@@ -405,10 +370,8 @@ async function main(): Promise<void> {
     for (const [key, recs] of grouped) {
       const [strategy, batchSize] = key.split("::");
       const avgTokens = Math.round(recs.reduce((s, r) => s + r.totalTokens, 0) / recs.length);
-      const avgSuccess = (recs.reduce((s, r) => s + r.successCount, 0) / recs.length).toFixed(1);
-      const avgRejected = (recs.reduce((s, r) => s + r.rejectedCount, 0) / recs.length).toFixed(1);
       console.log(
-        `${strategy!.padEnd(15)} ${batchSize!.padEnd(10)} ${String(avgTokens).padEnd(12)} ${avgSuccess.padEnd(12)} ${avgRejected}`,
+        `${strategy!.padEnd(15)} ${batchSize!.padEnd(10)} ${String(avgTokens).padEnd(12)} ${recs.length}`,
       );
     }
 
@@ -418,8 +381,6 @@ async function main(): Promise<void> {
     const totalCached = newRecords.reduce((s, r) => s + r.cachedTokens, 0);
     const totalThinking = newRecords.reduce((s, r) => s + r.thinkingTokens, 0);
     const totalAll = newRecords.reduce((s, r) => s + r.totalTokens, 0);
-    const totalSuccess = newRecords.reduce((s, r) => s + r.successCount, 0);
-    const totalRejected = newRecords.reduce((s, r) => s + r.rejectedCount, 0);
     const totalDuration = newRecords.reduce((s, r) => s + r.durationMs, 0);
 
     console.log("\n── Run totals ──");
@@ -428,7 +389,6 @@ async function main(): Promise<void> {
     console.log(`  Cached tokens     : ${totalCached.toLocaleString()}`);
     console.log(`  Thinking tokens   : ${totalThinking.toLocaleString()}`);
     console.log(`  Total tokens      : ${totalAll.toLocaleString()}`);
-    console.log(`  Success / Rejected: ${totalSuccess} / ${totalRejected}`);
     console.log(`  Wall time         : ${(totalDuration / 1000).toFixed(1)}s`);
   }
 
