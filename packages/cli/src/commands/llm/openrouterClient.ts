@@ -86,7 +86,7 @@ export async function callOpenRouter(args: {
     const d = data as Record<string, unknown>;
     const rawContent = (d?.["choices"] as any)?.[0]?.message?.content;
     const content: string = typeof rawContent === "string" ? rawContent : "";
-    const u = (d?.["usage"] as Record<string, unknown>) ?? {};
+    const u = (d?.["usage"] as any) ?? {};
 
     const usage: OpenRouterUsage = {
       promptTokens: u.prompt_tokens ?? 0,
