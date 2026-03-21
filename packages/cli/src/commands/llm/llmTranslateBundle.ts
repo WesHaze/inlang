@@ -58,9 +58,7 @@ export async function llmTranslateBundle(
     { sourceVariant: Variant; targetLocales: string[] }
   >();
 
-  for (const sourceVariant of args.bundle.messages.find(
-    (m) => m.locale === args.sourceLocale,
-  )!.variants) {
+  for (const sourceVariant of sourceMessage.variants) {
     for (const targetLocale of args.targetLocales) {
       if (targetLocale === args.sourceLocale) continue;
 

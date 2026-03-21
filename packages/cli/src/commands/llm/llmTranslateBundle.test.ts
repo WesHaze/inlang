@@ -124,64 +124,68 @@ runIf("llmTranslateBundle (integration)", () => {
     });
   }, 20_000);
 
-  it("skips already-translated variants unless force is true", async () => {
-    const project = await loadProjectInMemory({
-      blob: await newProject({
-        settings: { baseLocale: "en-gb", locales: ["en-gb", "nl"] },
-      }),
-    });
+});
 
-    await insertBundleNested(project.db, {
-      id: "existing",
-      messages: [
-        {
-          id: "existing_en",
-          bundleId: "existing",
-          locale: "en-gb",
-          variants: [
-            {
-              id: "existing_en_v",
-              messageId: "existing_en",
-              pattern: [{ type: "text", value: "Save" }],
-            },
-          ],
-        },
-        {
-          id: "existing_nl",
-          bundleId: "existing",
-          locale: "nl",
-          variants: [
-            {
-              id: "existing_nl_v",
-              messageId: "existing_nl",
-              pattern: [{ type: "text", value: "Opslaan" }],
-            },
-          ],
-        },
-      ],
-    });
+// Unit test — runs unconditionally, verifies skip logic (no API call made)
+it("skips already-translated variants without calling OpenRouter", async () => {
+  const project = await loadProjectInMemory({
+    blob: await newProject({
+      settings: { baseLocale: "en-gb", locales: ["en-gb", "nl"] },
+    }),
+  });
 
-    const [bundle] = await selectBundleNested(project.db).execute();
-    const result = await llmTranslateBundle({
-      bundle: bundle!,
-      sourceLocale: "en-gb",
-      targetLocales: ["nl"],
-      model: "openai/gpt-4o-mini",
-    });
+  await insertBundleNested(project.db, {
+    id: "existing",
+    messages: [
+      {
+        id: "existing_en",
+        bundleId: "existing",
+        locale: "en-gb",
+        variants: [
+          {
+            id: "existing_en_v",
+            messageId: "existing_en",
+            pattern: [{ type: "text", value: "Save" }],
+          },
+        ],
+      },
+      {
+        id: "existing_nl",
+        bundleId: "existing",
+        locale: "nl",
+        variants: [
+          {
+            id: "existing_nl_v",
+            messageId: "existing_nl",
+            pattern: [{ type: "text", value: "Opslaan" }],
+          },
+        ],
+      },
+    ],
+  });
 
-    // Should return data (unchanged bundle) without calling OpenRouter
-    expect(result.data).toBeDefined();
-    // The nl variant should still be "Opslaan" (not re-translated)
-    const nlMessage = result.data!.messages.find(
-      (m: NewMessageNested) => m.locale === "nl",
-    );
-    const variant = nlMessage!.variants[0] as NewVariant | undefined;
-    const nlPattern = variant!.pattern ?? [];
-    expect(
-      (nlPattern[0] as { type: "text"; value: string }).value,
-    ).toBe("Opslaan");
-  }, 5_000);
+  const [bundle] = await selectBundleNested(project.db).execute();
+  // Pass a deliberately invalid key — if the function called OpenRouter it would get a 401 error.
+  // The skip path must return { data } before any API call is attempted.
+  const result = await llmTranslateBundle({
+    bundle: bundle!,
+    sourceLocale: "en-gb",
+    targetLocales: ["nl"],
+    openrouterApiKey: "invalid-key-should-not-be-used",
+    model: "openai/gpt-4o-mini",
+  });
 
+  // Function should return { data } with no error — skip path runs before any API call
+  expect(result.error).toBeUndefined();
+  expect(result.data).toBeDefined();
+  const nlMessage = result.data!.messages.find(
+    (m: NewMessageNested) => m.locale === "nl",
+  );
+  const variant = nlMessage!.variants[0] as NewVariant | undefined;
+  const nlPattern = variant!.pattern ?? [];
+  expect(
+    (nlPattern[0] as { type: "text"; value: string }).value,
+  ).toBe("Opslaan");
 });
 
 // Unit test — runs unconditionally, no API key required
