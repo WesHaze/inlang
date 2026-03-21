@@ -6,7 +6,7 @@
  * token usage to results/runs.json and results/runs.csv.
  *
  * Usage:
- *   OPENROUTER_API_KEY=sk-... npx tsx benchmark.ts [--model openai/gpt-4o-mini] [--batch-sizes 5,10,20] [--dry-run]
+ *   OPENROUTER_API_KEY=sk-... npx tsx benchmark.ts [--model openai/gpt-5-mini] [--batch-sizes 5,10,20] [--dry-run]
  */
 
 import { randomUUID } from "node:crypto";
@@ -31,7 +31,7 @@ const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 // ── CLI args ──────────────────────────────────────────────────────────────
 
 const args = process.argv.slice(2);
-const modelArg = args.find((_, i) => args[i - 1] === "--model") ?? "openai/gpt-4o-mini";
+const modelArg = args.find((_, i) => args[i - 1] === "--model") ?? "openai/gpt-5-mini";
 const batchSizesArg = args.find((_, i) => args[i - 1] === "--batch-sizes") ?? "5,10,20,50,100";
 const dryRun = args.includes("--dry-run");
 
@@ -345,6 +345,25 @@ async function main(): Promise<void> {
         `${strategy!.padEnd(15)} ${batchSize!.padEnd(10)} ${String(avgTokens).padEnd(12)} ${avgSuccess.padEnd(12)} ${avgRejected}`,
       );
     }
+
+    // Grand totals across all cells in this run
+    const totalPrompt = newRecords.reduce((s, r) => s + r.promptTokens, 0);
+    const totalCompletion = newRecords.reduce((s, r) => s + r.completionTokens, 0);
+    const totalCached = newRecords.reduce((s, r) => s + r.cachedTokens, 0);
+    const totalThinking = newRecords.reduce((s, r) => s + r.thinkingTokens, 0);
+    const totalAll = newRecords.reduce((s, r) => s + r.totalTokens, 0);
+    const totalSuccess = newRecords.reduce((s, r) => s + r.successCount, 0);
+    const totalRejected = newRecords.reduce((s, r) => s + r.rejectedCount, 0);
+    const totalDuration = newRecords.reduce((s, r) => s + r.durationMs, 0);
+
+    console.log("\n── Run totals ──");
+    console.log(`  Prompt tokens     : ${totalPrompt.toLocaleString()}`);
+    console.log(`  Completion tokens : ${totalCompletion.toLocaleString()}`);
+    console.log(`  Cached tokens     : ${totalCached.toLocaleString()}`);
+    console.log(`  Thinking tokens   : ${totalThinking.toLocaleString()}`);
+    console.log(`  Total tokens      : ${totalAll.toLocaleString()}`);
+    console.log(`  Success / Rejected: ${totalSuccess} / ${totalRejected}`);
+    console.log(`  Wall time         : ${(totalDuration / 1000).toFixed(1)}s`);
   }
 
   console.log("\nDone.");
