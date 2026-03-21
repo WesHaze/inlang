@@ -33,8 +33,21 @@ function normalizeNode(node: unknown): unknown {
   return n;
 }
 
+function sortedStringify(obj: unknown): string {
+  if (Array.isArray(obj)) {
+    return `[${obj.map(sortedStringify).join(",")}]`;
+  }
+  if (obj !== null && typeof obj === "object") {
+    const keys = Object.keys(obj as object).sort();
+    return `{${keys
+      .map((k) => `${JSON.stringify(k)}:${sortedStringify((obj as Record<string, unknown>)[k])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(obj);
+}
+
 function nodesDeepEqual(a: unknown, b: unknown): boolean {
-  return JSON.stringify(normalizeNode(a)) === JSON.stringify(normalizeNode(b));
+  return sortedStringify(normalizeNode(a)) === sortedStringify(normalizeNode(b));
 }
 
 /**
@@ -68,11 +81,18 @@ export function validateTranslatedPattern(
 
   for (let i = 0; i < source.length; i++) {
     const src = source[i]!;
-    const tgt = translated[i] as Record<string, unknown>;
+    const tgt = translated[i];
+    if (typeof tgt !== "object" || tgt === null) {
+      return {
+        valid: false,
+        error: `Node at index ${i} is not an object`,
+      };
+    }
+    const tgtObj = tgt as Record<string, unknown>;
 
     if (src.type !== "text") {
       // Rule 3: non-text nodes must be deep-equal (normalised)
-      if (!nodesDeepEqual(src, tgt)) {
+      if (!nodesDeepEqual(src, tgtObj)) {
         return {
           valid: false,
           error: `Non-text node at index ${i} was modified by the LLM`,
@@ -82,16 +102,16 @@ export function validateTranslatedPattern(
     }
 
     // Rule 4: text node type must remain "text"
-    if (tgt["type"] !== "text") {
+    if (tgtObj["type"] !== "text") {
       return {
         valid: false,
-        error: `Node at index ${i} changed type from "text" to "${tgt["type"]}"`,
+        error: `Node at index ${i} changed type from "text" to "${tgtObj["type"]}"`,
       };
     }
 
     // Rule 5 + 6: non-empty source text nodes must remain non-empty
     const srcValue = (src as { type: "text"; value: string }).value;
-    const tgtValue = tgt["value"];
+    const tgtValue = tgtObj["value"];
     if (srcValue !== "" && (typeof tgtValue !== "string" || tgtValue === "")) {
       return {
         valid: false,
@@ -100,5 +120,5 @@ export function validateTranslatedPattern(
     }
   }
 
-  return { valid: true, pattern: translated as Pattern };
+  return { valid: true, pattern: translated as unknown as Pattern };
 }

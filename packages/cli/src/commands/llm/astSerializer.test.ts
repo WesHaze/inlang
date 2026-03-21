@@ -72,6 +72,7 @@ describe("validateTranslatedPattern", () => {
     ];
     const result = validateTranslatedPattern(sourceWithExpression, translated);
     expect(result.valid).toBe(false);
+    expect((result as any).error).toMatch(/changed type/);
   });
 
   it("returns invalid when a non-empty source text node becomes empty", () => {
@@ -128,5 +129,18 @@ describe("validateTranslatedPattern", () => {
   it("EDGE: returns invalid when LLM returns null", () => {
     const result = validateTranslatedPattern(sourceWithExpression, null);
     expect(result.valid).toBe(false);
+  });
+
+  it("accepts markup nodes where LLM reorders JSON keys", () => {
+    // Source: { type: "markup-start", name: "b" }
+    // LLM returns same data but with keys in different order: { name: "b", type: "markup-start" }
+    const translated = [
+      { type: "text", value: "Klik " },
+      { name: "b", type: "markup-start" }, // keys reordered by LLM
+      { type: "text", value: "hier" },
+      { name: "b", type: "markup-end" },   // keys reordered by LLM
+    ];
+    const result = validateTranslatedPattern(sourceWithMarkup, translated);
+    expect(result.valid).toBe(true);
   });
 });
