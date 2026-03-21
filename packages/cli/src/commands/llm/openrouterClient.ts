@@ -75,9 +75,18 @@ export async function callOpenRouter(args: {
       throw lastError;
     }
 
-    const data = await response.json();
-    const content: string = data?.choices?.[0]?.message?.content ?? "";
-    const u = data?.usage ?? {};
+    let data: unknown;
+    try {
+      data = await response.json();
+    } catch (err) {
+      throw new Error(
+        `OpenRouter returned non-JSON body: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+    const d = data as Record<string, unknown>;
+    const rawContent = (d?.["choices"] as any)?.[0]?.message?.content;
+    const content: string = typeof rawContent === "string" ? rawContent : "";
+    const u = (d?.["usage"] as Record<string, unknown>) ?? {};
 
     const usage: OpenRouterUsage = {
       promptTokens: u.prompt_tokens ?? 0,
@@ -90,6 +99,8 @@ export async function callOpenRouter(args: {
     return { content, usage };
   }
 
+  // Fallback: unreachable in normal operation but guards against future logic changes
+  // where the inline throws above might be removed. Keeps the return type Promise<OpenRouterResponse>.
   throw lastError ?? new Error("OpenRouter request failed after all attempts");
 }
 
