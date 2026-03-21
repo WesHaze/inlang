@@ -6,7 +6,6 @@ import type {
   NewMessageNested,
   NewVariant,
   Pattern,
-  Variant,
 } from "@inlang/sdk";
 import { callOpenRouter, type OpenRouterUsage } from "./openrouterClient.js";
 import { serializePattern, validateTranslatedPattern } from "./astSerializer.js";
@@ -55,7 +54,7 @@ export async function llmTranslateBundle(
   // Map: variantId → { sourceVariant, targetLocales[] }
   const work = new Map<
     string,
-    { sourceVariant: Variant; targetLocales: string[] }
+    { sourceVariant: NewVariant; targetLocales: string[] }
   >();
 
   for (const sourceVariant of sourceMessage.variants) {
@@ -68,18 +67,19 @@ export async function llmTranslateBundle(
       if (targetMessage && !args.force) {
         const existing = findMatchingVariant(
           targetMessage.variants,
-          sourceVariant.matches,
+          sourceVariant.matches ?? [],
         );
         if (existing && !isEmptyPattern(existing.pattern ?? [])) continue;
       }
 
-      if (!work.has(sourceVariant.id)) {
-        work.set(sourceVariant.id, {
+      const variantId = sourceVariant.id ?? randomUUID();
+      if (!work.has(variantId)) {
+        work.set(variantId, {
           sourceVariant,
           targetLocales: [],
         });
       }
-      work.get(sourceVariant.id)!.targetLocales.push(targetLocale);
+      work.get(variantId)!.targetLocales.push(targetLocale);
     }
   }
 
@@ -102,7 +102,7 @@ export async function llmTranslateBundle(
       `Translate from "${args.sourceLocale}" to: ${targetLocales.join(", ")}.`,
       contextLine,
       `Source pattern (JSON array):`,
-      serializePattern(sourceVariant.pattern),
+      serializePattern(sourceVariant.pattern ?? []),
       ``,
       `Respond with ONLY a JSON object in this shape:`,
       `{ "locale": [ ...translated pattern array... ] }`,
@@ -159,7 +159,7 @@ export async function llmTranslateBundle(
     for (const targetLocale of targetLocales) {
       const rawPattern = translationsMap[targetLocale];
       const validation = validateTranslatedPattern(
-        sourceVariant.pattern,
+        sourceVariant.pattern ?? [],
         rawPattern,
       );
 
@@ -177,7 +177,7 @@ export async function llmTranslateBundle(
       if (targetMessage) {
         const existingVariant = findMatchingVariant(
           targetMessage.variants,
-          sourceVariant.matches,
+          sourceVariant.matches ?? [],
         );
         if (existingVariant) {
           existingVariant.pattern = validation.pattern;
