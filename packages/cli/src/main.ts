@@ -1,5 +1,6 @@
 import { Command } from "commander";
 import { machine } from "./commands/machine/index.js";
+import { llm } from "./commands/llm/index.js";
 import { plugin } from "./commands/plugin/index.js";
 import { version } from "../package.json";
 import { initErrorMonitoring } from "./services/error-monitoring/implementation.js";
@@ -28,6 +29,7 @@ export const cli = new Command()
   // Commands
   .addCommand(validate)
   .addCommand(machine)
+  .addCommand(llm)
   .addCommand(plugin)
   .addCommand(lint)
   // Hooks
