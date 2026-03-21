@@ -190,29 +190,116 @@ export function generateFixtureKeys(): NewBundleNested[] {
   }
 
   // ── Long strings > 100 chars with variables (70) ─────────────────────────
+  // These templates test nuanced translation: tone shifts, subordinate clauses,
+  // idioms, marketing register, legal phrasing, and complex grammar structure.
   const longTemplates: Array<Array<{ t?: string; v?: string }>> = [
+    // Empathetic onboarding — warm tone, second-person address
     [
-      { t: "Your booking for " },
-      { v: "nights" },
-      { t: " nights at " },
-      { v: "property" },
-      { t: " has been confirmed. A confirmation email has been sent to " },
+      { t: "We're so glad you joined us, " },
+      { v: "name" },
+      { t: ". Take a moment to explore your new workspace — everything has been set up just for you." },
+    ],
+    // Marketing CTA — persuasive, urgency without being pushy
+    [
+      { t: "Your free trial of " },
+      { v: "planName" },
+      { t: " ends in " },
+      { v: "daysLeft" },
+      { t: " days. Upgrade now to keep everything you've built and unlock unlimited collaborators." },
+    ],
+    // Legal/privacy — precise, passive voice, institutional tone
+    [
+      { t: "By continuing, you agree that " },
+      { v: "companyName" },
+      { t: " may process your personal data in accordance with its Privacy Policy, which was last updated on " },
+      { v: "updateDate" },
+      { t: "." },
+    ],
+    // Empathetic error — apology with actionable next step
+    [
+      { t: "We're sorry, but your payment of " },
+      { v: "amount" },
+      { t: " could not be processed. Please check your billing details or contact your bank — your work has been saved and nothing has been lost." },
+    ],
+    // Success with consequence — cause-and-effect sentence structure
+    [
+      { t: "Great news! " },
+      { v: "name" },
+      { t: " accepted your invitation to " },
+      { v: "workspaceName" },
+      { t: " and can now view and edit all shared projects." },
+    ],
+    // Conditional / hypothetical — subjunctive-adjacent phrasing
+    [
+      { t: "If you did not request a password reset, please ignore this email — your account is safe and no changes have been made to " },
       { v: "email" },
       { t: "." },
     ],
+    // Relative clause — complex grammar that reorders in many languages
     [
-      { t: "The export of " },
-      { v: "count" },
-      { t: " records has been scheduled. You will receive a notification at " },
-      { v: "email" },
-      { t: " when it is ready to download." },
+      { t: "The report that " },
+      { v: "author" },
+      { t: " submitted on " },
+      { v: "date" },
+      { t: " is currently under review and will be published once all approvals are in place." },
     ],
+    // Idiomatic encouragement — tone matters most, literal translation fails
     [
-      { t: "An error occurred while processing your request for " },
-      { v: "resource" },
-      { t: ". Please try again or contact support at " },
-      { v: "supportEmail" },
-      { t: " if the issue persists." },
+      { t: "You're on a roll! You've completed " },
+      { v: "count" },
+      { t: " tasks this week — keep it up and you'll hit your monthly goal ahead of schedule." },
+    ],
+    // Formal notification — passive, institutional, bureaucratic register
+    [
+      { t: "Please be advised that your subscription to " },
+      { v: "planName" },
+      { t: " will renew automatically on " },
+      { v: "renewalDate" },
+      { t: ". To cancel, visit your billing settings at least 24 hours before the renewal date." },
+    ],
+    // Sensitive / supportive — mental-health adjacent, careful wording
+    [
+      { t: "It looks like you've been working for a while, " },
+      { v: "name" },
+      { t: ". Remember to take a break — stepping away for a few minutes can help you come back with fresh eyes." },
+    ],
+    // Technical explanation — precise but accessible
+    [
+      { t: "Your file " },
+      { v: "filename" },
+      { t: " exceeds the maximum upload size of " },
+      { v: "maxSize" },
+      { t: " MB. Try compressing the file or splitting it into smaller parts before uploading." },
+    ],
+    // Social proof / community framing
+    [
+      { t: "Join " },
+      { v: "count" },
+      { t: " teams who already use " },
+      { v: "productName" },
+      { t: " to ship faster, collaborate without friction, and keep their work organised in one place." },
+    ],
+    // Concessive clause — "even though" structure
+    [
+      { t: "Even though your session expired, all your changes to " },
+      { v: "documentName" },
+      { t: " were saved automatically. Sign back in to pick up exactly where you left off." },
+    ],
+    // Passive + agent — complex syntactic structure
+    [
+      { t: "This document was last edited by " },
+      { v: "editor" },
+      { t: " on " },
+      { v: "date" },
+      { t: " and is currently locked for editing. Contact " },
+      { v: "editor" },
+      { t: " to request access." },
+    ],
+    // Rhetorical question → statement — register shift within one string
+    [
+      { t: "Not sure where to start? " },
+      { v: "name" },
+      { t: ", your personalised setup guide is ready — it covers the three steps that most teams complete in their first session." },
     ],
   ];
   for (let i = 0; i < 70; i++) {
