@@ -33,7 +33,10 @@ const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const args = process.argv.slice(2);
 const modelArg = args.find((_, i) => args[i - 1] === "--model") ?? "openai/gpt-5-mini";
 const batchSizesArg = args.find((_, i) => args[i - 1] === "--batch-sizes") ?? "5,10,20,50,100";
+const concurrencyArg = args.find((_, i) => args[i - 1] === "--concurrency") ?? "4";
 const dryRun = args.includes("--dry-run");
+
+const CONCURRENCY = Math.max(1, parseInt(concurrencyArg, 10));
 
 const BATCH_SIZES = batchSizesArg.split(",").map(Number);
 const STRATEGIES: Array<"multi-locale" | "per-locale"> = ["multi-locale", "per-locale"];
@@ -41,13 +44,28 @@ const SOURCE_LOCALE = "en-gb";
 const TARGET_LOCALES = ["nl", "de", "fr", "es"];
 const MODEL = modelArg;
 
-const apiKey = process.env.OPENROUTER_API_KEY;
-if (!dryRun && !apiKey) {
-  console.error("OPENROUTER_API_KEY is required unless --dry-run is used.");
-  process.exit(1);
-}
+// const apiKey = process.env.OPENROUTER_API_KEY;
+// if (!dryRun && !apiKey) {
+//   console.error("OPENROUTER_API_KEY is required unless --dry-run is used.");
+//   process.exit(1);
+// }
+
+const apiKey = "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";
+// if (!dryRun && !apiKey) {
+//   console.error("OPENROUTER_API_KEY is required unless --dry-run is used.");
+//   process.exit(1);
+// }
 
 // ── Types ─────────────────────────────────────────────────────────────────
+
+type KeyTranslation = {
+  keyId: string;
+  source: string;                        // text nodes joined — human-readable
+  locales: Record<string, {
+    text: string;                        // translated text nodes joined
+    valid: boolean;
+  }>;
+};
 
 type BenchmarkRecord = {
   runId: string;
@@ -66,6 +84,7 @@ type BenchmarkRecord = {
   successCount: number;
   rejectedCount: number;
   durationMs: number;
+  keys: KeyTranslation[];
 };
 
 // ── OpenRouter call ───────────────────────────────────────────────────────
@@ -108,7 +127,35 @@ async function callOpenRouter(
   };
 }
 
+// ── Concurrency helper ────────────────────────────────────────────────────
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let index = 0;
+  async function worker() {
+    while (true) {
+      const current = index++;
+      if (current >= items.length) return;
+      results[current] = await mapper(items[current]!, current);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.max(1, concurrency) }, worker));
+  return results;
+}
+
 // ── Serialization helpers ─────────────────────────────────────────────────
+
+function patternToText(pattern: unknown): string {
+  if (!Array.isArray(pattern)) return "";
+  return (pattern as Record<string, unknown>[])
+    .filter((n) => n["type"] === "text")
+    .map((n) => String(n["value"] ?? ""))
+    .join("");
+}
 
 function validatePattern(source: unknown[], translated: unknown): boolean {
   if (!Array.isArray(translated)) return false;
@@ -132,9 +179,8 @@ async function runExperiment(
   keys: Bundle[],
   batchSize: number,
   strategy: "multi-locale" | "per-locale",
+  concurrency: number,
 ): Promise<BenchmarkRecord[]> {
-  const records: BenchmarkRecord[] = [];
-
   // Chunk keys into batches
   const chunks: Bundle[][] = [];
   for (let i = 0; i < keys.length; i += batchSize) {
@@ -144,7 +190,8 @@ async function runExperiment(
   const localesToTest =
     strategy === "multi-locale" ? [TARGET_LOCALES] : TARGET_LOCALES.map((l) => [l]);
 
-  for (const chunk of chunks) {
+  const nestedRecords = await mapWithConcurrency(chunks, concurrency, async (chunk) => {
+    const chunkRecords: BenchmarkRecord[] = [];
     for (const locales of localesToTest) {
       // Build the multi-key prompt for this chunk
       const keyEntries: Record<string, { sourceLocale: string; pattern: unknown; targetLocales: string[] }> = {};
@@ -208,23 +255,33 @@ async function runExperiment(
         rejectedCount = chunk.length * locales.length;
       }
 
+      const keyTranslations: KeyTranslation[] = [];
+
       for (const bundle of chunk) {
         const srcMessage = bundle.messages.find((m) => m.locale === SOURCE_LOCALE);
         if (!srcMessage) continue;
         const srcVariant = srcMessage.variants[0];
         if (!srcVariant) continue;
 
+        const keyEntry: KeyTranslation = {
+          keyId: bundle.id,
+          source: patternToText(srcVariant.pattern),
+          locales: {},
+        };
+
         for (const locale of locales) {
           const translated = translations?.[bundle.id]?.[locale];
-          if (validatePattern(srcVariant.pattern as unknown[], translated)) {
+          const valid = validatePattern(srcVariant.pattern as unknown[], translated);
+          keyEntry.locales[locale] = { text: patternToText(translated), valid };
+          if (valid) {
             successCount++;
           } else {
             rejectedCount++;
-            console.warn(
-              `  [WARN] Validation failed: ${bundle.id} → ${locale}`,
-            );
+            console.warn(`  [WARN] Validation failed: ${bundle.id} → ${locale}`);
           }
         }
+
+        keyTranslations.push(keyEntry);
       }
 
       const record: BenchmarkRecord = {
@@ -244,16 +301,18 @@ async function runExperiment(
         successCount,
         rejectedCount,
         durationMs,
+        keys: keyTranslations,
       };
 
-      records.push(record);
+      chunkRecords.push(record);
       console.log(
         `  [${strategy}] batchSize=${batchSize} keys=${chunk.length} locales=${locales.join(",")} tokens=${result.totalTokens} success=${successCount} rejected=${rejectedCount} ms=${durationMs}`,
       );
     }
-  }
+    return chunkRecords;
+  });
 
-  return records;
+  return nestedRecords.flat();
 }
 
 // ── Results I/O ───────────────────────────────────────────────────────────
@@ -276,7 +335,11 @@ function saveCsv(records: BenchmarkRecord[]): void {
   const header = Object.keys(records[0]!).join(",");
   const rows = records.map((r) =>
     Object.values(r)
-      .map((v) => (Array.isArray(v) ? `"${v.join(";")}"` : String(v)))
+      .map((v) =>
+        typeof v === "object" && v !== null
+          ? `"${JSON.stringify(v).replace(/"/g, '""')}"`
+          : String(v),
+      )
       .join(","),
   );
   fs.writeFileSync(RUNS_CSV, [header, ...rows].join("\n"), "utf8");
@@ -289,6 +352,7 @@ async function main(): Promise<void> {
   console.log(`Model       : ${MODEL}`);
   console.log(`Batch sizes : ${BATCH_SIZES.join(", ")}`);
   console.log(`Strategies  : ${STRATEGIES.join(", ")}`);
+  console.log(`Concurrency : ${CONCURRENCY}`);
   console.log(`Dry run     : ${dryRun}`);
   console.log(`\nLoading fixture keys...`);
 
@@ -315,7 +379,7 @@ async function main(): Promise<void> {
   for (const batchSize of BATCH_SIZES) {
     for (const strategy of STRATEGIES) {
       console.log(`\n── batchSize=${batchSize} strategy=${strategy} ──`);
-      const records = await runExperiment(runId, allBundles, batchSize, strategy);
+      const records = await runExperiment(runId, allBundles, batchSize, strategy, CONCURRENCY);
       newRecords.push(...records);
     }
   }
