@@ -58,7 +58,7 @@ export const translate = new Command()
       const settings = await project.settings.get();
       const sourceLocale: string = options.locale ?? settings.baseLocale;
       const targetLocales: string[] = options.targetLocales
-        ? options.targetLocales[0]?.split(",")
+        ? (options.targetLocales as string[]).flatMap((s: string) => s.split(","))
         : settings.locales.filter((l: string) => l !== sourceLocale);
 
       await llmTranslateCommandAction({
@@ -163,13 +163,22 @@ export async function llmTranslateCommandAction(
       }
 
       if (result.data) {
-        await upsertBundleNested(project.db, result.data);
-        successCount++;
+        try {
+          await upsertBundleNested(project.db, result.data);
+          successCount++;
 
-        if (!quiet && result.usage) {
-          totalTokens += result.usage.totalTokens;
-          log.info(
-            `  [chunk ${chunkIdx + 1}/${chunks.length}] ${bundle.id} — ${result.usage.totalTokens} tokens`,
+          if (result.usage) {
+            totalTokens += result.usage.totalTokens;
+          }
+          if (!quiet && result.usage) {
+            log.info(
+              `  [chunk ${chunkIdx + 1}/${chunks.length}] ${bundle.id} — ${result.usage.totalTokens} tokens`,
+            );
+          }
+        } catch (upsertErr) {
+          errorCount++;
+          log.warn(
+            `  [${bundle.id}] failed to upsert: ${upsertErr instanceof Error ? upsertErr.message : String(upsertErr)}`,
           );
         }
       }
