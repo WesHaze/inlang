@@ -73,16 +73,22 @@ This translates all bundles that are missing a translation for any locale define
 
 `--model` accepts any model ID from [openrouter.ai/models](https://openrouter.ai/models).
 
-| Model | Use case |
+**We strongly recommend lite reasoning models.** Models with a reasoning step (even a lightweight one) produce noticeably better results in two areas that matter most for translation:
+
+- **Variable preservation** — messages like `"Hello {name}, you have {count} items"` require the model to leave `{name}` and `{count}` untouched while translating the surrounding text. Reasoning models are significantly more reliable at this.
+- **Context-aware word choice** — when you supply brand/style instructions via `--context`, reasoning models are better at applying them consistently across all strings in a batch.
+
+| Model | Notes |
 | --- | --- |
-| `openai/gpt-4o-mini` *(default)* | Fast and low-cost. Good for most UI strings. |
-| `openai/gpt-4o` | Higher quality. Better for long or nuanced strings. |
-| `anthropic/claude-3.5-sonnet` | Strong at preserving tone and formatting. |
+| `openai/gpt-4o-mini` *(default)* | Fast and low-cost. Good baseline for simple strings. |
+| `openai/o4-mini` *(recommended)* | Lite reasoning. Best balance of speed, cost, and accuracy for most projects. |
+| `anthropic/claude-3.5-haiku` | Lite reasoning variant. Strong at tone and context adherence. |
+| `openai/gpt-4o` | Higher quality non-reasoning option for long or nuanced strings. |
 
 Example:
 
 ```bash
-npx @inlang/cli llm translate --project ./project.inlang --model openai/gpt-4o
+npx @inlang/cli llm translate --project ./project.inlang --model openai/o4-mini
 ```
 
 ---
