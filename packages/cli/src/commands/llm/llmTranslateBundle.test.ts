@@ -13,8 +13,8 @@ import { generateFixtureKeys } from "./fixtures.js";
 import { DEFAULT_MODEL } from "./translate.js";
 
 // These tests require a real OpenRouter API key.
-// They will be skipped in CI unless OPENROUTER_API_KEY is set.
-const runIf = process.env.OPENROUTER_API_KEY
+// They are skipped in CI (CI=true) and when OPENROUTER_API_KEY is not set.
+const runIf = process.env.OPENROUTER_API_KEY && !process.env.CI
   ? describe
   : describe.skip;
 

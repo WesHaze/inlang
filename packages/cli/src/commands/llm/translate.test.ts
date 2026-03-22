@@ -8,7 +8,7 @@ import {
 import { llmTranslateCommandAction, DEFAULT_MODEL } from "./translate.js";
 import { generateFixtureKeys } from "./fixtures.js";
 
-test.runIf(process.env.OPENROUTER_API_KEY)(
+test.runIf(process.env.OPENROUTER_API_KEY && !process.env.CI)(
   "llmTranslateCommandAction translates fixture keys end-to-end",
   async () => {
     const project = await loadProjectInMemory({
