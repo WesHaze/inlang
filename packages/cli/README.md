@@ -114,12 +114,13 @@ If one of the commands can't be found, you probably use an outdated CLI version.
 
 # Commands
 
-| Name            | Command                                       | Description                                                                                                                                                         |
-| --------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **CLI Version** | `npx @inlang/cli@latest [command]`            | Get the latest version of the inlang CLI.                                                                                                                           |
-| **Validate**    | `npx @inlang/cli validate [options]`          | Validate if the project is working correctly.                                                                                                                       |
-| **Machine**     | `npx @inlang/cli machine translate [options]` | Automate translation processes. Options include `-f, --force`, `--project <path>`, `--locale <source>` and `--targetLocales <targets...>`                           |
-| **Plugin**      | `npx @inlang/cli plugin [command]`            | Interact with Inlang plugins, including initialization and building. `build [options]` build an inlang module. Options include `--type`, `--entry`, and `--outdir`. |
+| Name              | Command                                       | Description                                                                                                                                                         |
+| ----------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **CLI Version**   | `npx @inlang/cli@latest [command]`            | Get the latest version of the inlang CLI.                                                                                                                           |
+| **Validate**      | `npx @inlang/cli validate [options]`          | Validate if the project is working correctly.                                                                                                                       |
+| **Machine**       | `npx @inlang/cli machine translate [options]` | Automate translation processes. Options include `-f, --force`, `--project <path>`, `--locale <source>` and `--targetLocales <targets...>`                           |
+| **LLM Translate** | `npx @inlang/cli llm translate [options]`     | Translate missing messages using an LLM via OpenRouter. Requires `OPENROUTER_API_KEY`.                                                                              |
+| **Plugin**        | `npx @inlang/cli plugin [command]`            | Interact with Inlang plugins, including initialization and building. `build [options]` build an inlang module. Options include `--type`, `--entry`, and `--outdir`. |
 
 ---
 
@@ -178,6 +179,43 @@ The translate command has the following options:
 - `--targetLocales <targets...>`: Specifies the target locales as comma seperated list (e.g. sk,zh,pt-BR).
 
 The translations are performed using machine translation services. The translated messages are added to the respective language resources. Finally, the updated resources are written back to the file system.
+
+## `llm`
+
+The llm command group provides LLM-powered translation via [OpenRouter](https://openrouter.ai).
+
+### `llm translate`
+
+Translates missing messages using an LLM of your choice. Unlike `machine translate` (which uses Google Translate), `llm translate` sends your translation bundles to any model available on OpenRouter.
+
+**Requires an OpenRouter API key:**
+
+```bash
+export OPENROUTER_API_KEY="your-api-key"
+```
+
+**Usage:**
+
+```sh
+npx @inlang/cli llm translate --project ./project.inlang
+```
+
+**Options**
+
+| Flag | Default | Description |
+|---|---|---|
+| `--project <path>` | — | **Required.** Path to `.inlang` project directory |
+| `--model <id>` | `openai/gpt-4o-mini` | Any [OpenRouter model ID](https://openrouter.ai/models) |
+| `--locale <locale>` | `settings.baseLocale` | Override source locale from project settings |
+| `--targetLocales <locales...>` | all non-source locales | Target locales. Space-separated or comma-separated, e.g. `--targetLocales fr de` or `--targetLocales fr,de` |
+| `--context <text>` | — | Inline brand/style instructions for the LLM |
+| `--context-file <path>` | — | Path to a markdown file with brand/style instructions (takes precedence over `--context`) |
+| `--batch-size <n>` | `200` | Number of bundles per LLM call |
+| `--force` | false | Overwrite existing non-empty translations |
+| `--dry-run` | false | Preview what would be translated without writing or calling the API |
+| `-q, --quiet` | false | Suppress per-batch token log lines |
+
+See [docs/llm-translate.md](./docs/llm-translate.md) for full details including environment variables and model selection.
 
 ## `validate`
 
