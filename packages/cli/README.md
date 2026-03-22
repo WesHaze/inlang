@@ -186,7 +186,7 @@ The llm command group provides LLM-powered translation via [OpenRouter](https://
 
 ### `llm translate`
 
-Translates missing messages using an LLM of your choice. Unlike `machine translate` (which uses Google Translate), `llm translate` sends your translation bundles to any model available on OpenRouter.
+Translates missing messages using an LLM of your choice. Unlike `machine translate` (which uses inlang's built-in translation service), `llm translate` sends your translation bundles to any model available on OpenRouter.
 
 **Requires an OpenRouter API key:**
 

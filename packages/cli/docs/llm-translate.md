@@ -7,7 +7,7 @@ description: Use any LLM to translate missing messages in your inlang project. S
 
 Translate missing messages using an LLM of your choice via [OpenRouter](https://openrouter.ai).
 
-Unlike `machine translate` (which uses Google Translate), `llm translate` lets you pick any model and inject brand/style context so translations match your product's tone.
+Unlike `machine translate` (which uses inlang's built-in translation service), `llm translate` lets you pick any model and inject brand/style context so translations match your product's tone.
 
 ## Quick start
 
