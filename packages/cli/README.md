@@ -206,7 +206,7 @@ npx @inlang/cli llm translate --project ./project.inlang
 | Flag | Default | Description |
 |---|---|---|
 | `--project <path>` | — | **Required.** Path to `.inlang` project directory |
-| `--model <id>` | `openai/gpt-4o-mini` | Any [OpenRouter model ID](https://openrouter.ai/models) |
+| `--model <id>` | `openai/gpt-5-mini` | Any [OpenRouter model ID](https://openrouter.ai/models) |
 | `--locale <locale>` | `settings.baseLocale` | Override source locale from project settings |
 | `--targetLocales <locales...>` | all non-source locales | Target locales. Space-separated or comma-separated, e.g. `--targetLocales fr de` or `--targetLocales fr,de` |
 | `--context <text>` | — | Inline brand/style instructions for the LLM |
@@ -215,6 +215,7 @@ npx @inlang/cli llm translate --project ./project.inlang
 | `--force` | false | Overwrite existing non-empty translations |
 | `--dry-run` | false | Preview what would be translated without writing or calling the API |
 | `-q, --quiet` | false | Suppress per-batch token log lines |
+| `--api-key <key>` | — | OpenRouter API key (overrides `OPENROUTER_API_KEY` env var) |
 
 See [docs/llm-translate.md](./docs/llm-translate.md) for full details including environment variables and model selection.
 

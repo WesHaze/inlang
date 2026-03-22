@@ -15,13 +15,21 @@ Unlike `machine translate` (which uses inlang's built-in translation service), `
 
 Sign up at [openrouter.ai](https://openrouter.ai) and create an API key.
 
-**2. Export the key**
+**2. Set the key**
+
+Either export it as an environment variable:
 
 ```bash
 export OPENROUTER_API_KEY="your-api-key"
 ```
 
-For CI/CD, add it as a secret environment variable in your provider's settings.
+Or pass it directly on the command line:
+
+```bash
+npx @inlang/cli llm translate --project ./project.inlang --api-key "your-api-key"
+```
+
+For CI/CD, the environment variable approach is recommended — add it as a secret in your provider's settings.
 
 **3. Run**
 
@@ -47,6 +55,7 @@ This translates all bundles that are missing a translation for any locale define
 | `--force` | false | Overwrite existing non-empty translations |
 | `--dry-run` | false | Preview what would be translated without writing or calling the API |
 | `-q, --quiet` | false | Suppress per-batch token log lines |
+| `--api-key <key>` | — | OpenRouter API key. Overrides `OPENROUTER_API_KEY` env var. |
 
 ---
 
@@ -54,7 +63,7 @@ This translates all bundles that are missing a translation for any locale define
 
 | Variable | Required | Description |
 | --- | --- | --- |
-| `OPENROUTER_API_KEY` | Yes (unless `--dry-run`) | API key from [openrouter.ai](https://openrouter.ai) |
+| `OPENROUTER_API_KEY` | Yes (unless `--dry-run` or `--api-key` is set) | API key from [openrouter.ai](https://openrouter.ai) |
 | `OPENROUTER_SITE_URL` | No | Sent as `HTTP-Referer` header — used by OpenRouter for attribution |
 | `OPENROUTER_SITE_NAME` | No | Sent as `X-Title` header — used by OpenRouter for attribution |
 

@@ -40,6 +40,7 @@ export const translate = new Command()
   .option("--force", "Overwrite existing translations.", false)
   .option("--dry-run", "Preview what would be translated without writing.", false)
   .option("-q, --quiet", "Suppress per-bundle logging.", false)
+  .option("--api-key <key>", "OpenRouter API key (overrides OPENROUTER_API_KEY env var).")
   .description("Translate bundles using an LLM via OpenRouter.")
   .action(async (args: { project: string }) => {
     let exitCode = 0;
@@ -66,6 +67,7 @@ export const translate = new Command()
         sourceLocale,
         targetLocales,
         model: options.model,
+        apiKey: options.apiKey,
         context,
         batchSize: options.batchSize,
         force: options.force,
@@ -89,6 +91,7 @@ export type LlmTranslateCommandActionArgs = {
   sourceLocale: string;
   targetLocales: string[];
   model: string;
+  apiKey?: string;
   context?: string;
   batchSize?: number;
   force?: boolean;
@@ -111,7 +114,7 @@ export async function llmTranslateCommandAction(
     quiet = false,
   } = args;
 
-  const apiKey = process.env.OPENROUTER_API_KEY;
+  const apiKey = args.apiKey ?? process.env.OPENROUTER_API_KEY;
   if (!dryRun && !apiKey) {
     throw new Error("OPENROUTER_API_KEY is required unless --dry-run is used.");
   }
@@ -143,7 +146,7 @@ export async function llmTranslateCommandAction(
 
   const batchResults = await Promise.all(
     chunks.map((chunk, chunkIdx) =>
-      llmTranslateBundles({ bundles: chunk, sourceLocale, targetLocales, model, context, force })
+      llmTranslateBundles({ bundles: chunk, sourceLocale, targetLocales, model, openrouterApiKey: apiKey, context, force })
         .then(async ({ results, usage }) => {
           totalTokens += usage.totalTokens;
           await Promise.all(
