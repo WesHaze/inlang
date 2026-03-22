@@ -17,6 +17,7 @@ npx @inlang/cli [command]
 ## Features
 
 - **Machine Translation** — Translate missing messages automatically via Google Cloud Translation or the free inlang translation service
+- **LLM Translation** — Translate with any LLM via OpenRouter — bring your own model and style context
 - **Validation** — Verify your project config is correct before committing
 - **CI/CD Ready** — Run non-interactively with `--force` for pipelines
 - **Plugin System** — Supports JSON, i18next, next-intl, ICU message format, and more
