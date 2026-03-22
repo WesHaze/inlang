@@ -11,7 +11,7 @@ import { getInlangProject } from "../../utilities/getInlangProject.js";
 import { log, logError } from "../../utilities/log.js";
 import { llmTranslateBundles } from "./llmTranslateBundle.js";
 
-export const DEFAULT_MODEL = "openai/gpt-4o-mini";
+export const DEFAULT_MODEL = "openai/gpt-5-mini";
 
 export const translate = new Command()
   .command("translate")

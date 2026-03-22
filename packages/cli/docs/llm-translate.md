@@ -46,7 +46,7 @@ This translates all bundles that are missing a translation for any locale define
 | Flag | Default | Description |
 | --- | --- | --- |
 | `--project <path>` | — | **Required.** Path to the `.inlang` project directory |
-| `--model <id>` | `openai/gpt-4o-mini` | Any [OpenRouter model ID](https://openrouter.ai/models) |
+| `--model <id>` | `openai/gpt-5-mini` | Any [OpenRouter model ID](https://openrouter.ai/models) |
 | `--locale <locale>` | `settings.baseLocale` | Override source locale from project settings |
 | `--targetLocales <locales...>` | all non-source locales | Target locales. Space-separated or comma-separated, e.g. `--targetLocales fr de` or `--targetLocales fr,de` |
 | `--context <text>` | — | Inline brand/style instructions for the LLM |
@@ -80,7 +80,7 @@ This translates all bundles that are missing a translation for any locale define
 
 | Model | Notes |
 | --- | --- |
-| `openai/gpt-4o-mini` *(default)* | Fast and low-cost. Good baseline for simple strings. |
+| `openai/gpt-5-mini` *(default)* | Fast and low-cost. Good baseline for simple strings. |
 | `openai/o4-mini` *(recommended)* | Lite reasoning. Best balance of speed, cost, and accuracy for most projects. |
 | `anthropic/claude-3.5-haiku` | Lite reasoning variant. Strong at tone and context adherence. |
 | `openai/gpt-4o` | Higher quality non-reasoning option for long or nuanced strings. |
