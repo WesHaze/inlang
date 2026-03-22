@@ -9,12 +9,14 @@ import {
 import { projectOption } from "../../utilities/globalFlags.js";
 import { getInlangProject } from "../../utilities/getInlangProject.js";
 import { log, logError } from "../../utilities/log.js";
-import { llmTranslateBundle } from "./llmTranslateBundle.js";
+import { llmTranslateBundles } from "./llmTranslateBundle.js";
+
+export const DEFAULT_MODEL = "openai/gpt-4o-mini";
 
 export const translate = new Command()
   .command("translate")
   .requiredOption(projectOption.flags, projectOption.description)
-  .option("--model <id>", "OpenRouter model ID.", "openai/gpt-4o-mini")
+  .option("--model <id>", "OpenRouter model ID.", DEFAULT_MODEL)
   .option("--locale <locale>", "Override source locale from project settings.")
   .option(
     "--targetLocales <locales...>",
@@ -27,15 +29,13 @@ export const translate = new Command()
   )
   .option(
     "--batch-size <n>",
-    "Bundles per parallel batch.",
-    (v) => parseInt(v, 10),
-    20,
-  )
-  .option(
-    "--concurrency <n>",
-    "Number of parallel batches.",
-    (v) => parseInt(v, 10),
-    4,
+    "Bundles per LLM call.",
+    (v) => {
+      const n = parseInt(v, 10);
+      if (isNaN(n) || n < 1) throw new Error(`--batch-size must be a positive integer, got: "${v}"`);
+      return n;
+    },
+    200,
   )
   .option("--force", "Overwrite existing translations.", false)
   .option("--dry-run", "Preview what would be translated without writing.", false)
@@ -67,7 +67,6 @@ export const translate = new Command()
         targetLocales,
         model: options.model,
         context,
-        concurrency: options.concurrency,
         batchSize: options.batchSize,
         force: options.force,
         dryRun: options.dryRun,
@@ -91,7 +90,6 @@ export type LlmTranslateCommandActionArgs = {
   targetLocales: string[];
   model: string;
   context?: string;
-  concurrency?: number;
   batchSize?: number;
   force?: boolean;
   dryRun?: boolean;
@@ -107,8 +105,7 @@ export async function llmTranslateCommandAction(
     targetLocales,
     model,
     context,
-    concurrency = 4,
-    batchSize = 20,
+    batchSize = 200,
     force = false,
     dryRun = false,
     quiet = false,
@@ -130,12 +127,11 @@ export async function llmTranslateCommandAction(
 
   if (dryRun) {
     log.info(
-      `Dry run: would translate ${bundles.length} bundle(s) from "${sourceLocale}" to [${targetLocales.join(", ")}] using model "${model}".`,
+      `Dry run: would translate ${bundles.length} bundle(s) in batches of ${batchSize} from "${sourceLocale}" to [${targetLocales.join(", ")}] using model "${model}".`,
     );
     return;
   }
 
-  // Chunk bundles into batches; batches run with limited concurrency
   const chunks: typeof bundles[] = [];
   for (let i = 0; i < bundles.length; i += batchSize) {
     chunks.push(bundles.slice(i, i + batchSize));
@@ -145,69 +141,42 @@ export async function llmTranslateCommandAction(
   let successCount = 0;
   let errorCount = 0;
 
-  await mapWithConcurrency(chunks, concurrency, async (chunk, chunkIdx) => {
-    for (const bundle of chunk) {
-      const result = await llmTranslateBundle({
-        bundle,
-        sourceLocale,
-        targetLocales,
-        model,
-        context,
-        force,
-      });
-
-      if (result.error) {
-        errorCount++;
-        log.warn(`  [${bundle.id}] error: ${result.error}`);
-        continue;
-      }
-
-      if (result.data) {
-        try {
-          await upsertBundleNested(project.db, result.data);
-          successCount++;
-
-          if (result.usage) {
-            totalTokens += result.usage.totalTokens;
-          }
-          if (!quiet && result.usage) {
-            log.info(
-              `  [chunk ${chunkIdx + 1}/${chunks.length}] ${bundle.id} — ${result.usage.totalTokens} tokens`,
-            );
-          }
-        } catch (upsertErr) {
-          errorCount++;
-          log.warn(
-            `  [${bundle.id}] failed to upsert: ${upsertErr instanceof Error ? upsertErr.message : String(upsertErr)}`,
+  const batchResults = await Promise.all(
+    chunks.map((chunk, chunkIdx) =>
+      llmTranslateBundles({ bundles: chunk, sourceLocale, targetLocales, model, context, force })
+        .then(async ({ results, usage }) => {
+          totalTokens += usage.totalTokens;
+          await Promise.all(
+            results.map(async (result, i) => {
+              const bundle = chunk[i]!;
+              if (result.error) {
+                errorCount++;
+                log.warn(`  [${bundle.id}] error: ${result.error}`);
+                return;
+              }
+              if (result.data) {
+                try {
+                  await upsertBundleNested(project.db, result.data);
+                  successCount++;
+                } catch (upsertErr) {
+                  errorCount++;
+                  log.warn(
+                    `  [${bundle.id}] failed to upsert: ${upsertErr instanceof Error ? upsertErr.message : String(upsertErr)}`,
+                  );
+                }
+              }
+            }),
           );
-        }
-      }
-    }
-  });
+          if (!quiet) {
+            log.info(`  [batch ${chunkIdx + 1}/${chunks.length}] ${usage.totalTokens} tokens`);
+          }
+        }),
+    ),
+  );
+
+  void batchResults; // results processed inline above
 
   log.success(
-    `LLM translate complete. ${successCount} bundle(s) translated, ${errorCount} error(s). Total tokens: ${totalTokens}.`,
+    `LLM translate complete. ${successCount} bundle(s) translated, ${errorCount} error(s). Total tokens used: ${totalTokens}.`,
   );
-}
-
-async function mapWithConcurrency<T, R>(
-  items: T[],
-  concurrency: number,
-  mapper: (item: T, index: number) => Promise<R>,
-): Promise<R[]> {
-  const results: R[] = new Array(items.length);
-  let index = 0;
-
-  async function worker() {
-    while (true) {
-      const current = index++;
-      if (current >= items.length) return;
-      results[current] = await mapper(items[current]!, current);
-    }
-  }
-
-  await Promise.all(
-    Array.from({ length: Math.max(1, concurrency) }, () => worker()),
-  );
-  return results;
 }

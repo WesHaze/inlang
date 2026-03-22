@@ -131,6 +131,35 @@ describe("validateTranslatedPattern", () => {
     expect(result.valid).toBe(false);
   });
 
+  it("EDGE: empty source text node with non-string LLM value still passes (type check skipped)", () => {
+    // Bug #12: when srcValue === "" the value type check is bypassed.
+    // This test documents current behavior; if the bug is fixed it should be updated to expect invalid.
+    const translated = [
+      { type: "expression", arg: { type: "variable-reference", name: "a" } },
+      { type: "text", value: 42 }, // number instead of string — should ideally fail
+      { type: "expression", arg: { type: "variable-reference", name: "b" } },
+    ];
+    const result = validateTranslatedPattern(sourceWithEmptyText, translated);
+    // Currently passes because srcValue === "" short-circuits the string check.
+    expect(result.valid).toBe(true);
+  });
+
+  it("EDGE: unknown node type is deep-compared and passes when identical to source", () => {
+    const unknownNode = { type: "future-node-type", data: "x" };
+    const source: Pattern = [unknownNode as any];
+    const translated = [{ type: "future-node-type", data: "x" }];
+    const result = validateTranslatedPattern(source, translated);
+    expect(result.valid).toBe(true);
+  });
+
+  it("EDGE: unknown node type fails when modified by LLM", () => {
+    const unknownNode = { type: "future-node-type", data: "x" };
+    const source: Pattern = [unknownNode as any];
+    const translated = [{ type: "future-node-type", data: "CHANGED" }];
+    const result = validateTranslatedPattern(source, translated);
+    expect(result.valid).toBe(false);
+  });
+
   it("accepts markup nodes where LLM reorders JSON keys", () => {
     // Source: { type: "markup-start", name: "b" }
     // LLM returns same data but with keys in different order: { name: "b", type: "markup-start" }

@@ -1,6 +1,7 @@
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const MAX_ATTEMPTS = 5;
 const BASE_DELAY_MS = 500;
+const REQUEST_TIMEOUT_MS = 60_000;
 
 export type OpenRouterMessage = {
   role: "system" | "user";
@@ -52,21 +53,36 @@ export async function callOpenRouter(args: {
   let lastError: Error | undefined;
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
     let response: Response;
     try {
-      response = await fetch(OPENROUTER_URL, { method: "POST", headers, body });
+      response = await fetch(OPENROUTER_URL, { method: "POST", headers, body, signal: controller.signal });
     } catch (err) {
-      lastError = err instanceof Error ? err : new Error(String(err));
+      clearTimeout(timeoutId);
+      const isAbort = err instanceof Error && err.name === "AbortError";
+      lastError = isAbort
+        ? new Error(`OpenRouter request timed out after ${REQUEST_TIMEOUT_MS}ms (attempt ${attempt}/${MAX_ATTEMPTS})`)
+        : err instanceof Error ? err : new Error(String(err));
       if (attempt < MAX_ATTEMPTS) {
         await sleep(BASE_DELAY_MS * 2 ** (attempt - 1) + Math.random() * 200);
         continue;
       }
       throw lastError;
     }
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       const text = await response.text();
-      lastError = new Error(`OpenRouter HTTP ${response.status}: ${text}`);
+      // Try to extract a human-readable message from the JSON error body
+      let message = text;
+      try {
+        const errBody = JSON.parse(text) as Record<string, unknown>;
+        const inner = errBody["error"] as Record<string, unknown> | undefined;
+        if (typeof inner?.["message"] === "string") message = inner["message"];
+      } catch { /* use raw text */ }
+      lastError = new Error(`OpenRouter HTTP ${response.status}: ${message}`);
       const isTransient = response.status === 429 || response.status >= 500;
       if (isTransient && attempt < MAX_ATTEMPTS) {
         await sleep(BASE_DELAY_MS * 2 ** (attempt - 1) + Math.random() * 200);

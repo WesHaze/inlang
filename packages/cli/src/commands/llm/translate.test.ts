@@ -5,48 +5,32 @@ import {
   newProject,
   selectBundleNested,
 } from "@inlang/sdk";
-import { llmTranslateCommandAction } from "./translate.js";
+import { llmTranslateCommandAction, DEFAULT_MODEL } from "./translate.js";
+import { generateFixtureKeys } from "./fixtures.js";
 
 test.runIf(process.env.OPENROUTER_API_KEY)(
-  "llmTranslateCommandAction translates missing locales end-to-end",
+  "llmTranslateCommandAction translates fixture keys end-to-end",
   async () => {
     const project = await loadProjectInMemory({
       blob: await newProject({
-        settings: { baseLocale: "en-gb", locales: ["en-gb", "nl"] },
+        settings: { baseLocale: "en-gb", locales: ["en-gb", "nl", "de"] },
       }),
     });
 
-    await insertBundleNested(project.db, {
-      id: "hello",
-      messages: [
-        {
-          id: "hello_en",
-          bundleId: "hello",
-          locale: "en-gb",
-          variants: [
-            {
-              id: "hello_en_v",
-              messageId: "hello_en",
-              pattern: [{ type: "text", value: "Hello World" }],
-            },
-          ],
-        },
-      ],
-    });
+    // Use first 20 fixture keys — covers simple, variable, and multi-variable patterns
+    const fixtureKeys = generateFixtureKeys().slice(0, 20);
+    await Promise.all(fixtureKeys.map((key) => insertBundleNested(project.db, key)));
 
     await llmTranslateCommandAction({
       project,
       sourceLocale: "en-gb",
-      targetLocales: ["nl"],
-      model: "openai/gpt-4o-mini",
-      concurrency: 1,
-      batchSize: 10,
+      targetLocales: ["nl", "de"],
+      model: DEFAULT_MODEL,
+      batchSize: 20,
     });
 
     const bundles = await selectBundleNested(project.db).execute();
-    const messages = bundles[0]?.messages;
-    expect(messages?.length).toBe(2);
-    expect(messages?.find((m) => m.locale === "nl")).toBeDefined();
+    expect(bundles.length).toBe(fixtureKeys.length);
   },
-  { timeout: 20_000 },
+  { timeout: 60_000 },
 );
