@@ -259,6 +259,72 @@ describe("llmTranslateCommandAction — missing API key", () => {
       process.env.OPENROUTER_API_KEY = savedKey;
     }
   });
+
+  it("does not throw when apiKey arg is provided and OPENROUTER_API_KEY env var is absent", async () => {
+    const project = await makeProject();
+    await insertBundle(project.db, "greet");
+    vi.mocked(llmTranslateBundles).mockResolvedValue({ results: [makeMockResult("greet")], usage: emptyUsage });
+
+    const savedKey = process.env.OPENROUTER_API_KEY;
+    try {
+      delete process.env.OPENROUTER_API_KEY;
+      await expect(
+        llmTranslateCommandAction({
+          project,
+          sourceLocale: "en-gb",
+          targetLocales: ["nl"],
+          model: DEFAULT_MODEL,
+          apiKey: "explicit-key",
+        }),
+      ).resolves.not.toThrow();
+    } finally {
+      process.env.OPENROUTER_API_KEY = savedKey;
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// --api-key forwarded
+// ---------------------------------------------------------------------------
+
+describe("llmTranslateCommandAction — api-key forwarded", () => {
+  it("passes apiKey arg to llmTranslateBundles as openrouterApiKey", async () => {
+    const project = await makeProject();
+    await insertBundle(project.db, "greet");
+    vi.mocked(llmTranslateBundles).mockResolvedValue({ results: [makeMockResult("greet")], usage: emptyUsage });
+
+    await llmTranslateCommandAction({
+      project,
+      sourceLocale: "en-gb",
+      targetLocales: ["nl"],
+      model: DEFAULT_MODEL,
+      apiKey: "my-explicit-key",
+    });
+
+    expect(vi.mocked(llmTranslateBundles).mock.calls[0]![0].openrouterApiKey).toBe("my-explicit-key");
+  });
+
+  it("apiKey arg takes precedence over OPENROUTER_API_KEY env var", async () => {
+    const project = await makeProject();
+    await insertBundle(project.db, "greet");
+    vi.mocked(llmTranslateBundles).mockResolvedValue({ results: [makeMockResult("greet")], usage: emptyUsage });
+
+    const savedKey = process.env.OPENROUTER_API_KEY;
+    try {
+      process.env.OPENROUTER_API_KEY = "env-key";
+      await llmTranslateCommandAction({
+        project,
+        sourceLocale: "en-gb",
+        targetLocales: ["nl"],
+        model: DEFAULT_MODEL,
+        apiKey: "arg-key",
+      });
+    } finally {
+      process.env.OPENROUTER_API_KEY = savedKey;
+    }
+
+    expect(vi.mocked(llmTranslateBundles).mock.calls[0]![0].openrouterApiKey).toBe("arg-key");
+  });
 });
 
 // ---------------------------------------------------------------------------
