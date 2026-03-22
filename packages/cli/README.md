@@ -190,7 +190,7 @@ Translates missing messages using an LLM of your choice. Unlike `machine transla
 
 **Requires an OpenRouter API key:**
 
-```bash
+```sh
 export OPENROUTER_API_KEY="your-api-key"
 ```
 
