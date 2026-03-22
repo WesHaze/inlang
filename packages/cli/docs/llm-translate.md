@@ -113,7 +113,7 @@ npx @inlang/cli llm translate --project ./project.inlang \
   --context-file ./translation-context.md
 ```
 
-`--context-file` takes precedence over `--context` if both are provided.
+`--context-file` takes precedence over `--context` if both are provided. They are not merged.
 
 ---
 
@@ -122,8 +122,8 @@ npx @inlang/cli llm translate --project ./project.inlang \
 *This section is for contributors and anyone curious about the internals.*
 
 1. All bundles in the project are loaded and split into chunks of `--batch-size`.
-2. Each chunk is sent as a single LLM call via OpenRouter. The request payload is a JSON object keyed by `bundleId::variantId`, where each entry is `{ pattern: [...], targetLocales: [...] }`. The LLM is expected to return `{ "bundleId::variantId": { "locale": [...pattern...] } }`.
+2. Each chunk is passed to `llmTranslateBundles`, which sends the entire chunk as a single LLM call via OpenRouter. The request payload is a JSON object keyed by `bundleId::variantId`, where each entry is `{ pattern: [...], targetLocales: [...] }`. The LLM is expected to return `{ "bundleId::variantId": { "locale": [...pattern...] } }`.
 3. The LLM is instructed to translate only the `"value"` field of nodes where `"type"` is `"text"`. All other node types (`expression`, `markup-start`, `markup-end`, `markup-standalone`) must be returned exactly as given — this preserves variables and markup in translated strings.
-4. Each locale's translated pattern is validated: all non-text nodes must deep-equal their source counterparts, and text nodes that were non-empty in the source must remain non-empty. If a locale's pattern fails validation, only that locale-variant combination is skipped with a warning; other valid locales in the same bundle are still applied.
+4. In `llmTranslateBundles` (the function the command uses), each locale's translated pattern is validated: it must be a JSON array, all non-text nodes must deep-equal their source counterparts, and text nodes that were non-empty in the source must remain non-empty. If a locale's pattern fails validation, only that locale-variant combination is skipped with a warning; other valid locales in the same bundle are still applied.
 5. If the LLM returns unparseable JSON or a non-object response, the entire batch retries up to 3 total attempts with exponential backoff.
 6. The HTTP client separately retries on HTTP 429, 5xx, network errors, and request timeouts — up to 5 total attempts with exponential backoff.
