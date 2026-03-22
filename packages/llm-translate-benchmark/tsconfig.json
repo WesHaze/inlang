@@ -1,9 +1,0 @@
-{
-  "extends": "@inlang/tsconfig",
-  "compilerOptions": {
-    "outDir": "./dist",
-    "rootDir": "."
-  },
-  "include": ["./**/*.ts"],
-  "exclude": ["node_modules", "dist"]
-}
