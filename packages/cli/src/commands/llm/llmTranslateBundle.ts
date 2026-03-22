@@ -292,10 +292,10 @@ export async function llmTranslateBundles(
     return { results: copies.map((data) => ({ data })), usage: emptyUsage() };
   }
 
-  const keyEntries: Record<string, { pattern: Pattern; targetLocales: string[] }> = {};
+  const keyEntries: Record<string, { src: Pattern; targetLocales: string[] }> = {};
   for (const [key, { sourceVariant, targetLocales }] of workMap) {
     keyEntries[key] = {
-      pattern: sourceVariant.pattern ?? [],
+      src: sourceVariant.pattern ?? [],
       targetLocales,
     };
   }
@@ -305,6 +305,7 @@ export async function llmTranslateBundles(
     `Translate the following keys from "${args.sourceLocale}" to each key's specified target locales.`,
     contextLine,
     `Respond ONLY with minified JSON (no whitespace): {"key":{"locale":[...pattern...]}}`,
+    `IMPORTANT: each locale value must be a bare JSON array (not wrapped in an object).`,
     `Keys:`,
     JSON.stringify(keyEntries),
   ]
