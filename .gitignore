@@ -395,3 +395,6 @@ packages/lix-docs/docs/.vitepress/cache
 packages/lix-docs/docs/.vitepress/dist
 
 artifact/*
+
+.claude/worktrees
+.claude/settings.local.json
