@@ -1,4 +1,4 @@
-#!/usr/bin/env npx tsx
+// #!/usr/bin/env npx tsx
 /**
  * LLM Translate Benchmark
  *
@@ -33,10 +33,7 @@ const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const args = process.argv.slice(2);
 const modelArg = args.find((_, i) => args[i - 1] === "--model") ?? "openai/gpt-5-mini";
 const batchSizesArg = args.find((_, i) => args[i - 1] === "--batch-sizes") ?? "5,10,20,50,100";
-const concurrencyArg = args.find((_, i) => args[i - 1] === "--concurrency") ?? "4";
 const dryRun = args.includes("--dry-run");
-
-const CONCURRENCY = Math.max(1, parseInt(concurrencyArg, 10));
 
 const BATCH_SIZES = batchSizesArg.split(",").map(Number);
 const STRATEGIES: Array<"multi-locale" | "per-locale"> = ["multi-locale", "per-locale"];
@@ -44,17 +41,11 @@ const SOURCE_LOCALE = "en-gb";
 const TARGET_LOCALES = ["nl", "de", "fr", "es"];
 const MODEL = modelArg;
 
-// const apiKey = process.env.OPENROUTER_API_KEY;
-// if (!dryRun && !apiKey) {
-//   console.error("OPENROUTER_API_KEY is required unless --dry-run is used.");
-//   process.exit(1);
-// }
-
-const apiKey = "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";
-// if (!dryRun && !apiKey) {
-//   console.error("OPENROUTER_API_KEY is required unless --dry-run is used.");
-//   process.exit(1);
-// }
+const apiKey = process.env.OPENROUTER_API_KEY;
+if (!dryRun && !apiKey) {
+  console.error("OPENROUTER_API_KEY is required unless --dry-run is used.");
+  process.exit(1);
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -122,25 +113,6 @@ async function callOpenRouter(
   };
 }
 
-// ── Concurrency helper ────────────────────────────────────────────────────
-
-async function mapWithConcurrency<T, R>(
-  items: T[],
-  concurrency: number,
-  mapper: (item: T, index: number) => Promise<R>,
-): Promise<R[]> {
-  const results: R[] = new Array(items.length);
-  let index = 0;
-  async function worker() {
-    while (true) {
-      const current = index++;
-      if (current >= items.length) return;
-      results[current] = await mapper(items[current]!, current);
-    }
-  }
-  await Promise.all(Array.from({ length: Math.max(1, concurrency) }, worker));
-  return results;
-}
 
 // ── Serialization helpers ─────────────────────────────────────────────────
 
@@ -161,7 +133,6 @@ async function runExperiment(
   keys: Bundle[],
   batchSize: number,
   strategy: "multi-locale" | "per-locale",
-  concurrency: number,
 ): Promise<BenchmarkRecord[]> {
   // Chunk keys into batches
   const chunks: Bundle[][] = [];
@@ -172,10 +143,8 @@ async function runExperiment(
   const localesToTest =
     strategy === "multi-locale" ? [TARGET_LOCALES] : TARGET_LOCALES.map((l) => [l]);
 
-  const nestedRecords = await mapWithConcurrency(chunks, concurrency, async (chunk) => {
-    const chunkRecords: BenchmarkRecord[] = [];
-    for (const locales of localesToTest) {
-      // Build the multi-key prompt for this chunk
+  const nestedRecords = await Promise.all(chunks.map(async (chunk) => {
+    const localeResults = await Promise.all(localesToTest.map(async (locales) => {
       const keyEntries: Record<string, { sourceLocale: string; pattern: unknown; targetLocales: string[] }> = {};
 
       for (const bundle of chunk) {
@@ -209,7 +178,7 @@ async function runExperiment(
           `[DRY RUN] strategy=${strategy} batchSize=${batchSize} chunk=${chunk.length} locales=${locales.join(",")}`,
         );
         console.log(`  Prompt length: ${userContent.length} chars`);
-        continue;
+        return null;
       }
 
       const start = Date.now();
@@ -221,7 +190,7 @@ async function runExperiment(
         ]);
       } catch (err) {
         console.error(`  [ERROR] ${err}`);
-        continue;
+        return null;
       }
       const durationMs = Date.now() - start;
 
@@ -271,13 +240,14 @@ async function runExperiment(
         keys: keyTranslations,
       };
 
-      chunkRecords.push(record);
       console.log(
         `  [${strategy}] batchSize=${batchSize} keys=${chunk.length} locales=${locales.join(",")} tokens=${result.totalTokens} ms=${durationMs}`,
       );
-    }
-    return chunkRecords;
-  });
+      return record;
+    }));
+
+    return localeResults.filter((r): r is BenchmarkRecord => r !== null);
+  }));
 
   return nestedRecords.flat();
 }
@@ -319,7 +289,6 @@ async function main(): Promise<void> {
   console.log(`Model       : ${MODEL}`);
   console.log(`Batch sizes : ${BATCH_SIZES.join(", ")}`);
   console.log(`Strategies  : ${STRATEGIES.join(", ")}`);
-  console.log(`Concurrency : ${CONCURRENCY}`);
   console.log(`Dry run     : ${dryRun}`);
   console.log(`\nLoading fixture keys...`);
 
@@ -332,24 +301,26 @@ async function main(): Promise<void> {
   const fixtureKeys = generateFixtureKeys();
   console.log(`Inserting ${fixtureKeys.length} fixture keys...`);
 
-  for (const key of fixtureKeys) {
-    await insertBundleNested(project.db, key);
-  }
+  await Promise.all(fixtureKeys.map((key) => insertBundleNested(project.db, key)));
 
   const allBundles = await selectBundleNested(project.db).execute();
   console.log(`Loaded ${allBundles.length} bundles.\n`);
 
   const runId = randomUUID();
   const existingRuns = loadExistingRuns();
-  const newRecords: BenchmarkRecord[] = [];
 
-  for (const batchSize of BATCH_SIZES) {
-    for (const strategy of STRATEGIES) {
+  const combinations = BATCH_SIZES.flatMap((batchSize) =>
+    STRATEGIES.map((strategy) => ({ batchSize, strategy })),
+  );
+
+  const nestedResults = await Promise.all(
+    combinations.map(({ batchSize, strategy }) => {
       console.log(`\n── batchSize=${batchSize} strategy=${strategy} ──`);
-      const records = await runExperiment(runId, allBundles, batchSize, strategy, CONCURRENCY);
-      newRecords.push(...records);
-    }
-  }
+      return runExperiment(runId, allBundles, batchSize, strategy);
+    }),
+  );
+
+  const newRecords: BenchmarkRecord[] = nestedResults.flat();
 
   if (!dryRun && newRecords.length > 0) {
     const allRuns = [...existingRuns, ...newRecords];
