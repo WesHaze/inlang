@@ -17,7 +17,7 @@ Sign up at [openrouter.ai](https://openrouter.ai) and create an API key.
 
 **2. Export the key**
 
-```sh
+```bash
 export OPENROUTER_API_KEY="your-api-key"
 ```
 
@@ -25,7 +25,7 @@ For CI/CD, add it as a secret environment variable in your provider's settings.
 
 **3. Run**
 
-```sh
+```bash
 npx @inlang/cli llm translate --project ./project.inlang
 ```
 
@@ -36,7 +36,7 @@ This translates all bundles that are missing a translation for any locale define
 ## Options reference
 
 | Flag | Default | Description |
-|---|---|---|
+| --- | --- | --- |
 | `--project <path>` | — | **Required.** Path to the `.inlang` project directory |
 | `--model <id>` | `openai/gpt-4o-mini` | Any [OpenRouter model ID](https://openrouter.ai/models) |
 | `--locale <locale>` | `settings.baseLocale` | Override source locale from project settings |
@@ -53,7 +53,7 @@ This translates all bundles that are missing a translation for any locale define
 ## Environment variables
 
 | Variable | Required | Description |
-|---|---|---|
+| --- | --- | --- |
 | `OPENROUTER_API_KEY` | Yes (unless `--dry-run`) | API key from [openrouter.ai](https://openrouter.ai) |
 | `OPENROUTER_SITE_URL` | No | Sent as `HTTP-Referer` header — used by OpenRouter for attribution |
 | `OPENROUTER_SITE_NAME` | No | Sent as `X-Title` header — used by OpenRouter for attribution |
@@ -65,14 +65,14 @@ This translates all bundles that are missing a translation for any locale define
 `--model` accepts any model ID from [openrouter.ai/models](https://openrouter.ai/models).
 
 | Model | Use case |
-|---|---|
+| --- | --- |
 | `openai/gpt-4o-mini` *(default)* | Fast and low-cost. Good for most UI strings. |
 | `openai/gpt-4o` | Higher quality. Better for long or nuanced strings. |
 | `anthropic/claude-3.5-sonnet` | Strong at preserving tone and formatting. |
 
 Example:
 
-```sh
+```bash
 npx @inlang/cli llm translate --project ./project.inlang --model openai/gpt-4o
 ```
 
@@ -84,7 +84,7 @@ Use `--context` or `--context-file` to give the LLM instructions about your prod
 
 **Inline context:**
 
-```sh
+```bash
 npx @inlang/cli llm translate --project ./project.inlang \
   --context "Informal tone. Use 'you' not 'one'. Avoid jargon."
 ```
@@ -108,7 +108,7 @@ Write in a friendly, informal tone. Use "you" and avoid corporate language.
 
 Then pass it with `--context-file`:
 
-```sh
+```bash
 npx @inlang/cli llm translate --project ./project.inlang \
   --context-file ./translation-context.md
 ```
