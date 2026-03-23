@@ -20,7 +20,7 @@ Sign up at [openrouter.ai](https://openrouter.ai) and create an API key.
 Either export it as an environment variable:
 
 ```bash
-export OPENROUTER_API_KEY="your-api-key"
+export INLANG_OPENROUTER_API_KEY="your-api-key"
 ```
 
 Or pass it directly on the command line:
@@ -51,11 +51,11 @@ This translates all bundles that are missing a translation for any locale define
 | `--targetLocales <locales...>` | all non-source locales | Target locales. Space-separated or comma-separated, e.g. `--targetLocales fr de` or `--targetLocales fr,de` |
 | `--context <text>` | — | Inline brand/style instructions for the LLM |
 | `--context-file <path>` | — | Path to a markdown file with brand/style instructions (takes precedence over `--context`) |
-| `--batch-size <n>` | `200` | Number of bundles per LLM call |
+| `--batch-size <n>` | `10` | Number of bundles per LLM call |
 | `--force` | false | Overwrite existing non-empty translations |
 | `--dry-run` | false | Preview what would be translated without writing or calling the API |
 | `-q, --quiet` | false | Suppress per-batch token log lines |
-| `--api-key <key>` | — | OpenRouter API key. Overrides `OPENROUTER_API_KEY` env var. |
+| `--api-key <key>` | — | OpenRouter API key. Overrides `INLANG_OPENROUTER_API_KEY` env var. |
 
 ---
 
@@ -63,9 +63,9 @@ This translates all bundles that are missing a translation for any locale define
 
 | Variable | Required | Description |
 | --- | --- | --- |
-| `OPENROUTER_API_KEY` | Yes (unless `--dry-run` or `--api-key` is set) | API key from [openrouter.ai](https://openrouter.ai) |
-| `OPENROUTER_SITE_URL` | No | Sent as `HTTP-Referer` header — used by OpenRouter for attribution |
-| `OPENROUTER_SITE_NAME` | No | Sent as `X-Title` header — used by OpenRouter for attribution |
+| `INLANG_OPENROUTER_API_KEY` | Yes (unless `--dry-run` or `--api-key` is set) | API key from [openrouter.ai](https://openrouter.ai) |
+| `INLANG_OPENROUTER_SITE_URL` | No | Sent as `HTTP-Referer` header — used by OpenRouter for attribution |
+| `INLANG_OPENROUTER_SITE_NAME` | No | Sent as `X-Title` header — used by OpenRouter for attribution |
 
 ---
 

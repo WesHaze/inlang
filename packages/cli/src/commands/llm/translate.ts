@@ -40,7 +40,7 @@ export const translate = new Command()
   .option("--force", "Overwrite existing translations.", false)
   .option("--dry-run", "Preview what would be translated without writing.", false)
   .option("-q, --quiet", "Suppress per-bundle logging.", false)
-  .option("--api-key <key>", "OpenRouter API key (overrides OPENROUTER_API_KEY env var).")
+  .option("--api-key <key>", "OpenRouter API key (overrides INLANG_OPENROUTER_API_KEY env var).")
   .description("Translate bundles using an LLM via OpenRouter.")
   .action(async (args: { project: string }) => {
     let exitCode = 0;
@@ -115,9 +115,9 @@ export async function llmTranslateCommandAction(
   } = args;
 
   const targetLocales = args.targetLocales.map((s) => s.trim()).filter(Boolean);
-  const apiKey = args.apiKey ?? process.env.OPENROUTER_API_KEY;
+  const apiKey = args.apiKey ?? process.env.INLANG_OPENROUTER_API_KEY;
   if (!dryRun && !apiKey) {
-    throw new Error("OPENROUTER_API_KEY is required unless --dry-run is used.");
+    throw new Error("INLANG_OPENROUTER_API_KEY is required unless --dry-run is used.");
   }
 
   const bundles = await selectBundleNested(project.db).execute();

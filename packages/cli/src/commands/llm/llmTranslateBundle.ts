@@ -51,9 +51,9 @@ const SYSTEM_PROMPT =
 export async function llmTranslateBundle(
   args: LlmTranslateBundleArgs,
 ): Promise<LlmTranslateBundleResult> {
-  const apiKey = args.openrouterApiKey ?? process.env.OPENROUTER_API_KEY;
+  const apiKey = args.openrouterApiKey ?? process.env.INLANG_OPENROUTER_API_KEY;
   if (!apiKey) {
-    return { error: "OPENROUTER_API_KEY is not set" };
+    return { error: "INLANG_OPENROUTER_API_KEY is not set" };
   }
 
   const copy = structuredClone(args.bundle) as NewBundleNested;
@@ -144,8 +144,8 @@ export async function llmTranslateBundle(
             { role: "user", content: userContent },
           ],
           apiKey,
-          siteUrl: process.env.OPENROUTER_SITE_URL,
-          siteName: process.env.OPENROUTER_SITE_NAME,
+          siteUrl: process.env.INLANG_OPENROUTER_SITE_URL,
+          siteName: process.env.INLANG_OPENROUTER_SITE_NAME,
         });
       } catch (err) {
         // callOpenRouter already retried internally — propagate immediately.
@@ -240,7 +240,7 @@ export async function llmTranslateBundle(
 export async function llmTranslateBundles(
   args: LlmTranslateBundlesArgs,
 ): Promise<LlmTranslateBundlesResult> {
-  const apiKey = args.openrouterApiKey ?? process.env.OPENROUTER_API_KEY;
+  const apiKey = args.openrouterApiKey ?? process.env.INLANG_OPENROUTER_API_KEY;
   const emptyUsage = (): OpenRouterUsage => ({
     promptTokens: 0,
     completionTokens: 0,
@@ -251,7 +251,7 @@ export async function llmTranslateBundles(
 
   if (!apiKey) {
     return {
-      results: args.bundles.map(() => ({ error: "OPENROUTER_API_KEY is not set" })),
+      results: args.bundles.map(() => ({ error: "INLANG_OPENROUTER_API_KEY is not set" })),
       usage: emptyUsage(),
     };
   }
@@ -335,8 +335,8 @@ export async function llmTranslateBundles(
           { role: "user", content: userContent },
         ],
         apiKey,
-        siteUrl: process.env.OPENROUTER_SITE_URL,
-        siteName: process.env.OPENROUTER_SITE_NAME,
+        siteUrl: process.env.INLANG_OPENROUTER_SITE_URL,
+        siteName: process.env.INLANG_OPENROUTER_SITE_NAME,
       });
     } catch (err) {
       // callOpenRouter already retried internally — propagate immediately.

@@ -120,7 +120,7 @@ If one of the commands can't be found, you probably use an outdated CLI version.
 | **CLI Version**   | `npx @inlang/cli@latest [command]`            | Get the latest version of the inlang CLI.                                                                                                                           |
 | **Validate**      | `npx @inlang/cli validate [options]`          | Validate if the project is working correctly.                                                                                                                       |
 | **Machine**       | `npx @inlang/cli machine translate [options]` | Automate translation processes. Options include `-f, --force`, `--project <path>`, `--locale <source>` and `--targetLocales <targets...>`                           |
-| **LLM Translate** | `npx @inlang/cli llm translate [options]`     | Translate missing messages using an LLM via OpenRouter. Requires `OPENROUTER_API_KEY`.                                                                              |
+| **LLM Translate** | `npx @inlang/cli llm translate [options]`     | Translate missing messages using an LLM via OpenRouter. Requires `INLANG_OPENROUTER_API_KEY`.                                                                              |
 | **Plugin**        | `npx @inlang/cli plugin [command]`            | Interact with Inlang plugins, including initialization and building. `build [options]` build an inlang module. Options include `--type`, `--entry`, and `--outdir`. |
 
 ---
@@ -192,7 +192,7 @@ Translates missing messages using an LLM of your choice. Unlike `machine transla
 **Requires an OpenRouter API key:**
 
 ```sh
-export OPENROUTER_API_KEY="your-api-key"
+export INLANG_OPENROUTER_API_KEY="your-api-key"
 ```
 
 **Usage:**
@@ -215,7 +215,7 @@ npx @inlang/cli llm translate --project ./project.inlang
 | `--force` | false | Overwrite existing non-empty translations |
 | `--dry-run` | false | Preview what would be translated without writing or calling the API |
 | `-q, --quiet` | false | Suppress per-batch token log lines |
-| `--api-key <key>` | — | OpenRouter API key (overrides `OPENROUTER_API_KEY` env var) |
+| `--api-key <key>` | — | OpenRouter API key (overrides `INLANG_OPENROUTER_API_KEY` env var) |
 
 See [docs/llm-translate.md](./docs/llm-translate.md) for full details including environment variables and model selection.
 
