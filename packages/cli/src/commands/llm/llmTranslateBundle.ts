@@ -54,6 +54,16 @@ const SYSTEM_PROMPT =
   `exactly as given — do not add, remove, reorder, or modify them in any way. ` +
   `Always respond with a JSON object, never a bare array.`;
 
+/**
+ * Translates a single bundle by making one API call per source variant.
+ *
+ * This is the low-level primitive for per-bundle translation with per-variant
+ * retry narrowing. It is exported for use by callers that process bundles
+ * individually (e.g. streaming UIs, single-bundle tooling).
+ *
+ * For batch translation of multiple bundles in a single LLM call, use
+ * {@link llmTranslateBundles} instead.
+ */
 export async function llmTranslateBundle(
   args: LlmTranslateBundleArgs,
 ): Promise<LlmTranslateBundleResult> {
