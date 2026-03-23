@@ -10,6 +10,7 @@ import { projectOption } from "../../utilities/globalFlags.js";
 import { getInlangProject } from "../../utilities/getInlangProject.js";
 import { log, logError } from "../../utilities/log.js";
 import { llmTranslateBundles } from "./llmTranslateBundle.js";
+import { OPENROUTER_API_KEY_ENV } from "./openrouterClient.js";
 
 export const DEFAULT_MODEL = "openai/gpt-5-mini";
 
@@ -153,9 +154,9 @@ export async function llmTranslateCommandAction(
     return { successCount: 0, errorCount: 0 };
   }
 
-  const apiKey = args.apiKey ?? process.env.INLANG_OPENROUTER_API_KEY;
+  const apiKey = args.apiKey ?? process.env[OPENROUTER_API_KEY_ENV];
   if (!apiKey) {
-    throw new Error("INLANG_OPENROUTER_API_KEY is required unless --dry-run is used.");
+    throw new Error(`${OPENROUTER_API_KEY_ENV} is required unless --dry-run is used.`);
   }
 
   const chunks: typeof bundles[] = [];

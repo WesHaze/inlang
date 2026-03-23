@@ -7,7 +7,13 @@ import type {
   NewVariant,
   Pattern,
 } from "@inlang/sdk";
-import { callOpenRouter, type OpenRouterUsage } from "./openrouterClient.js";
+import {
+  callOpenRouter,
+  type OpenRouterUsage,
+  OPENROUTER_API_KEY_ENV,
+  OPENROUTER_SITE_URL_ENV,
+  OPENROUTER_SITE_NAME_ENV,
+} from "./openrouterClient.js";
 import { serializePattern, validateTranslatedPattern } from "./astSerializer.js";
 
 export type LlmTranslateBundleArgs = {
@@ -40,6 +46,11 @@ export type LlmTranslateBundleResult = {
 
 const MAX_RETRIES = 3;
 const RETRY_BASE_MS = 500;
+const LOG_PREFIX = "[llm-translate]";
+
+function emptyUsage(): OpenRouterUsage {
+  return { promptTokens: 0, completionTokens: 0, cachedTokens: 0, thinkingTokens: 0, totalTokens: 0 };
+}
 
 const SYSTEM_PROMPT =
   `You are a UI localisation expert. ` +
@@ -51,9 +62,9 @@ const SYSTEM_PROMPT =
 export async function llmTranslateBundle(
   args: LlmTranslateBundleArgs,
 ): Promise<LlmTranslateBundleResult> {
-  const apiKey = args.openrouterApiKey ?? process.env.INLANG_OPENROUTER_API_KEY;
+  const apiKey = args.openrouterApiKey ?? process.env[OPENROUTER_API_KEY_ENV];
   if (!apiKey) {
-    return { error: "INLANG_OPENROUTER_API_KEY is not set" };
+    return { error: `${OPENROUTER_API_KEY_ENV} is not set` };
   }
 
   const copy = structuredClone(args.bundle) as NewBundleNested;
@@ -101,7 +112,7 @@ export async function llmTranslateBundle(
 
   // Nothing to translate — return unchanged copy immediately (no API call)
   if (work.size === 0) {
-    return { data: copy, usage: { promptTokens: 0, completionTokens: 0, cachedTokens: 0, thinkingTokens: 0, totalTokens: 0 } };
+    return { data: copy, usage: emptyUsage() };
   }
 
   const totalUsage: OpenRouterUsage = {
@@ -144,8 +155,8 @@ export async function llmTranslateBundle(
             { role: "user", content: userContent },
           ],
           apiKey,
-          siteUrl: process.env.INLANG_OPENROUTER_SITE_URL,
-          siteName: process.env.INLANG_OPENROUTER_SITE_NAME,
+          siteUrl: process.env[OPENROUTER_SITE_URL_ENV],
+          siteName: process.env[OPENROUTER_SITE_NAME_ENV],
         });
       } catch (err) {
         // callOpenRouter already retried internally — propagate immediately.
@@ -163,14 +174,14 @@ export async function llmTranslateBundle(
         const parsed = JSON.parse(response.content) as unknown;
         if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
           if (!args.quiet) console.warn(
-            `[llm-translate] Bundle "${args.bundle.id}" (attempt ${attempt + 1}/${MAX_RETRIES}): LLM response was not a JSON object${attempt < MAX_RETRIES - 1 ? ", retrying..." : ", skipping variant"}`,
+            `${LOG_PREFIX} Bundle "${args.bundle.id}" (attempt ${attempt + 1}/${MAX_RETRIES}): LLM response was not a JSON object${attempt < MAX_RETRIES - 1 ? ", retrying..." : ", skipping variant"}`,
           );
           continue;
         }
         translationsMap = parsed as Record<string, unknown>;
       } catch {
         if (!args.quiet) console.warn(
-          `[llm-translate] Bundle "${args.bundle.id}" (attempt ${attempt + 1}/${MAX_RETRIES}): failed to parse LLM response as JSON${attempt < MAX_RETRIES - 1 ? ", retrying..." : ", skipping variant"}`,
+          `${LOG_PREFIX} Bundle "${args.bundle.id}" (attempt ${attempt + 1}/${MAX_RETRIES}): failed to parse LLM response as JSON${attempt < MAX_RETRIES - 1 ? ", retrying..." : ", skipping variant"}`,
         );
         continue;
       }
@@ -185,7 +196,7 @@ export async function llmTranslateBundle(
 
         if (!validation.valid) {
           if (!args.quiet) console.warn(
-            `[llm-translate] Bundle "${args.bundle.id}" → ${targetLocale} (attempt ${attempt + 1}/${MAX_RETRIES}): ${validation.error}${attempt < MAX_RETRIES - 1 ? ", retrying..." : ", skipping"}`,
+            `${LOG_PREFIX} Bundle "${args.bundle.id}" → ${targetLocale} (attempt ${attempt + 1}/${MAX_RETRIES}): ${validation.error}${attempt < MAX_RETRIES - 1 ? ", retrying..." : ", skipping"}`,
           );
           nextRemainingLocales.push(targetLocale);
           continue;
@@ -240,18 +251,11 @@ export async function llmTranslateBundle(
 export async function llmTranslateBundles(
   args: LlmTranslateBundlesArgs,
 ): Promise<LlmTranslateBundlesResult> {
-  const apiKey = args.openrouterApiKey ?? process.env.INLANG_OPENROUTER_API_KEY;
-  const emptyUsage = (): OpenRouterUsage => ({
-    promptTokens: 0,
-    completionTokens: 0,
-    cachedTokens: 0,
-    thinkingTokens: 0,
-    totalTokens: 0,
-  });
+  const apiKey = args.openrouterApiKey ?? process.env[OPENROUTER_API_KEY_ENV];
 
   if (!apiKey) {
     return {
-      results: args.bundles.map(() => ({ error: "INLANG_OPENROUTER_API_KEY is not set" })),
+      results: args.bundles.map(() => ({ error: `${OPENROUTER_API_KEY_ENV} is not set` })),
       usage: emptyUsage(),
     };
   }
@@ -355,7 +359,7 @@ export async function llmTranslateBundles(
       parsed = JSON.parse(response.content);
     } catch {
       if (attempt < MAX_RETRIES - 1) {
-        if (!args.quiet) console.warn(`[llm-translate] batch: failed to parse LLM response as JSON (attempt ${attempt + 1}/${MAX_RETRIES}), retrying...`);
+        if (!args.quiet) console.warn(`${LOG_PREFIX} batch: failed to parse LLM response as JSON (attempt ${attempt + 1}/${MAX_RETRIES}), retrying...`);
         continue;
       }
       return { results: args.bundles.map(() => ({ error: "Failed to parse LLM batch response as JSON after all retries" })), usage: accumulatedUsage };
@@ -363,7 +367,7 @@ export async function llmTranslateBundles(
 
     if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
       if (attempt < MAX_RETRIES - 1) {
-        if (!args.quiet) console.warn(`[llm-translate] batch: LLM response was not a JSON object (attempt ${attempt + 1}/${MAX_RETRIES}), retrying...`);
+        if (!args.quiet) console.warn(`${LOG_PREFIX} batch: LLM response was not a JSON object (attempt ${attempt + 1}/${MAX_RETRIES}), retrying...`);
         continue;
       }
       return { results: args.bundles.map(() => ({ error: "LLM returned non-object batch response after all retries" })), usage: accumulatedUsage };
@@ -394,7 +398,7 @@ export async function llmTranslateBundles(
           : (localeMap as Record<string, unknown>)[targetLocale];
       const validation = validateTranslatedPattern(sourceVariant.pattern ?? [], rawPattern);
       if (!validation.valid) {
-        if (!args.quiet) console.warn(`[llm-translate] Bundle "${copy.id}" → ${targetLocale}: ${validation.error}, skipping`);
+        if (!args.quiet) console.warn(`${LOG_PREFIX} Bundle "${copy.id}" → ${targetLocale}: ${validation.error}, skipping`);
         continue;
       }
 

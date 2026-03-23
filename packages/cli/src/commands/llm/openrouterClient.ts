@@ -3,6 +3,10 @@ const MAX_ATTEMPTS = 5;
 const BASE_DELAY_MS = 500;
 const REQUEST_TIMEOUT_MS = 60_000;
 
+export const OPENROUTER_API_KEY_ENV = "INLANG_OPENROUTER_API_KEY";
+export const OPENROUTER_SITE_URL_ENV = "INLANG_OPENROUTER_SITE_URL";
+export const OPENROUTER_SITE_NAME_ENV = "INLANG_OPENROUTER_SITE_NAME";
+
 export type OpenRouterMessage = {
   role: "system" | "user";
   content: string;

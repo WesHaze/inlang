@@ -426,7 +426,7 @@ describe("llmTranslateBundle — connection error on last retry returns error", 
       model: MODEL,
     });
 
-    expect(callOpenRouter).toHaveBeenCalledTimes(3); // MAX_RETRIES
+    expect(callOpenRouter).toHaveBeenCalledTimes(1); // callOpenRouter owns network retries; throws propagate immediately
     expect(result.error).toMatch(/connection refused/);
   });
 });
