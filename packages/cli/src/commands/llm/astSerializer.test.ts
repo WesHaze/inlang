@@ -75,13 +75,41 @@ describe("validateTranslatedPattern", () => {
     expect((result as any).error).toMatch(/changed type/);
   });
 
-  it("returns invalid when a non-empty source text node becomes empty", () => {
+  it("allows leading text node to become empty (word-order shift in target language)", () => {
+    // e.g. "Hello {name}!" → "{name} hallo!" where leading "Hello " disappears
     const translated = [
       { type: "text", value: "" },
       { type: "expression", arg: { type: "variable-reference", name: "name" } },
       { type: "text", value: "!" },
     ];
     const result = validateTranslatedPattern(sourceWithExpression, translated);
+    expect(result.valid).toBe(true);
+  });
+
+  it("allows trailing text node to become empty (word-order shift in target language)", () => {
+    // e.g. "Last updated {t} ago" → "Mis à jour il y a {t}" where trailing " ago" disappears
+    const translated = [
+      { type: "text", value: "Bonjour " },
+      { type: "expression", arg: { type: "variable-reference", name: "name" } },
+      { type: "text", value: "" },
+    ];
+    const result = validateTranslatedPattern(sourceWithExpression, translated);
+    expect(result.valid).toBe(true);
+  });
+
+  it("returns invalid when an interior text node becomes empty", () => {
+    // Interior nodes (not first/last) must stay non-empty
+    const sourceInterior: Pattern = [
+      { type: "expression", arg: { type: "variable-reference", name: "a" } },
+      { type: "text", value: " and " },
+      { type: "expression", arg: { type: "variable-reference", name: "b" } },
+    ];
+    const translated = [
+      { type: "expression", arg: { type: "variable-reference", name: "a" } },
+      { type: "text", value: "" },
+      { type: "expression", arg: { type: "variable-reference", name: "b" } },
+    ];
+    const result = validateTranslatedPattern(sourceInterior, translated);
     expect(result.valid).toBe(false);
     expect((result as any).error).toMatch(/empty/);
   });
@@ -131,17 +159,15 @@ describe("validateTranslatedPattern", () => {
     expect(result.valid).toBe(false);
   });
 
-  it("EDGE: empty source text node with non-string LLM value still passes (type check skipped)", () => {
-    // Bug #12: when srcValue === "" the value type check is bypassed.
-    // This test documents current behavior; if the bug is fixed it should be updated to expect invalid.
+  it("EDGE: empty source text node with non-string LLM value is rejected", () => {
     const translated = [
       { type: "expression", arg: { type: "variable-reference", name: "a" } },
-      { type: "text", value: 42 }, // number instead of string — should ideally fail
+      { type: "text", value: 42 }, // number instead of string — must fail
       { type: "expression", arg: { type: "variable-reference", name: "b" } },
     ];
     const result = validateTranslatedPattern(sourceWithEmptyText, translated);
-    // Currently passes because srcValue === "" short-circuits the string check.
-    expect(result.valid).toBe(true);
+    expect(result.valid).toBe(false);
+    expect((result as any).error).toMatch(/not a string/);
   });
 
   it("EDGE: unknown node type is deep-compared and passes when identical to source", () => {

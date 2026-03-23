@@ -109,10 +109,20 @@ export function validateTranslatedPattern(
       };
     }
 
-    // Rule 5 + 6: non-empty source text nodes must remain non-empty
+    // Rule 5: tgtValue must always be a string
     const srcValue = (src as { type: "text"; value: string }).value;
     const tgtValue = tgtObj["value"];
-    if (srcValue !== "" && (typeof tgtValue !== "string" || tgtValue === "")) {
+    if (typeof tgtValue !== "string") {
+      return {
+        valid: false,
+        error: `Text node at index ${i} value is not a string`,
+      };
+    }
+    // Rule 6: interior text nodes (not leading or trailing) that were non-empty must stay non-empty.
+    // Leading/trailing nodes may become empty when word order shifts a variable to the edge
+    // (e.g. "Last updated {t} ago" → French "Mis à jour il y a {t}").
+    const isInterior = i > 0 && i < source.length - 1;
+    if (srcValue !== "" && isInterior && tgtValue === "") {
       return {
         valid: false,
         error: `Text node at index ${i} became empty after translation`,
