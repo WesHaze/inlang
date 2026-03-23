@@ -298,6 +298,69 @@ runIf("llmTranslateBundle (integration)", () => {
     }
   }, 30_000);
 
+  it("RTL: Arabic translation produces Arabic script and preserves variables", async () => {
+    const project = await loadProjectInMemory({
+      blob: await newProject({
+        settings: { baseLocale: "en", locales: ["en", "ar"] },
+      }),
+    });
+
+    await insertBundleNested(project.db, {
+      id: "rtl_plain",
+      messages: [{
+        id: "rtl_plain_msg", bundleId: "rtl_plain", locale: "en",
+        variants: [{ id: "rtl_plain_var", messageId: "rtl_plain_msg", pattern: [{ type: "text" as const, value: "Save your changes before leaving." }] }],
+      }],
+    });
+
+    await insertBundleNested(project.db, {
+      id: "rtl_with_var",
+      messages: [{
+        id: "rtl_with_var_msg", bundleId: "rtl_with_var", locale: "en",
+        variants: [{
+          id: "rtl_with_var_v", messageId: "rtl_with_var_msg",
+          pattern: [
+            { type: "text" as const, value: "Hello " },
+            { type: "expression" as const, arg: { type: "variable-reference" as const, name: "name" } },
+            { type: "text" as const, value: ", your account is ready." },
+          ],
+        }],
+      }],
+    });
+
+    const bundles = await selectBundleNested(project.db).execute();
+    const arabicScript = /[\u0600-\u06FF]/;
+
+    for (const bundle of bundles) {
+      const result = await llmTranslateBundle({
+        bundle,
+        sourceLocale: "en",
+        targetLocales: ["ar"],
+        client: integrationClient,
+        model: DEFAULT_MODEL,
+      });
+      expect(result.error, `${bundle.id}: unexpected error`).toBeUndefined();
+
+      const msg = result.data!.messages.find((m: NewMessageNested) => m.locale === "ar");
+      expect(msg, `${bundle.id}: missing ar message`).toBeDefined();
+      const tgtPattern = (msg!.variants[0] as NewVariant | undefined)?.pattern ?? [];
+
+      // At least one text node must contain Arabic script characters.
+      const hasArabic = tgtPattern.some(
+        (n) => n.type === "text" && "value" in n && arabicScript.test(String(n.value)),
+      );
+      expect(hasArabic, `${bundle.id}: no Arabic script found in translated pattern`).toBe(true);
+
+      // Expression nodes must be preserved unchanged.
+      const srcPattern = bundle.messages[0]!.variants[0]!.pattern ?? [];
+      srcPattern.forEach((srcNode, i) => {
+        if (srcNode.type === "expression") {
+          expect(tgtPattern[i], `${bundle.id}/ar[${i}]: expression node mutated`).toEqual(srcNode);
+        }
+      });
+    }
+  }, 30_000);
+
   it("EDGE: preserves expression nodes (variables) in translated pattern", async () => {
     const project = await loadProjectInMemory({
       blob: await newProject({
