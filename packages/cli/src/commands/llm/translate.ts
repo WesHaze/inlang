@@ -20,7 +20,7 @@ export const translate = new Command()
   .option("--locale <locale>", "Override source locale from project settings.")
   .option(
     "--targetLocales <locales...>",
-    "Target locales for translation (comma-separated).",
+    "Space-separated list of target locales (also accepts comma-separated), e.g. --targetLocales fr de ja.",
   )
   .option("--context <text>", "Inline brand/style instructions for the LLM.")
   .option(
@@ -38,7 +38,7 @@ export const translate = new Command()
     10,
   )
   .option("--force", "Overwrite existing translations.", false)
-  .option("--dry-run", "Preview what would be translated without writing.", false)
+  .option("--dry-run", "Preview translation plan. Skips API key check and makes no API calls.", false)
   .option("-q, --quiet", "Suppress per-bundle logging.", false)
   .option("--api-key <key>", "OpenRouter API key (overrides INLANG_OPENROUTER_API_KEY env var).")
   .description("Translate bundles using an LLM via OpenRouter.")

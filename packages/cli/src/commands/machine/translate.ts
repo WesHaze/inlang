@@ -27,7 +27,7 @@ export const translate = new Command()
     "Comma separated list of target locales for translation."
   )
   .option("-n, --nobar", "disable progress bar", false)
-  .description("Machine translate bundles.")
+  .description("Machine translate bundles. For LLM-powered translation with custom models, use `inlang llm translate` instead.")
   .action(async (args: { force: boolean; project: string }) => {
     let exitCode = 0;
     try {
