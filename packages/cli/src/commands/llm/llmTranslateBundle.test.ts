@@ -207,6 +207,49 @@ runIf("llmTranslateBundle (integration)", () => {
     }
   }, 60_000);
 
+  it("EDGE: variable-only pattern is returned unchanged (no text to translate)", async () => {
+    const project = await loadProjectInMemory({
+      blob: await newProject({
+        settings: { baseLocale: "en", locales: ["en", "de", "ja"] },
+      }),
+    });
+
+    await insertBundleNested(project.db, {
+      id: "var_only",
+      messages: [{
+        id: "var_only_msg", bundleId: "var_only", locale: "en",
+        variants: [{
+          id: "var_only_var", messageId: "var_only_msg",
+          pattern: [
+            { type: "expression", arg: { type: "variable-reference", name: "count" } },
+          ],
+        }],
+      }],
+    });
+
+    const [bundle] = await selectBundleNested(project.db).execute();
+    const result = await llmTranslateBundle({
+      bundle: bundle!,
+      sourceLocale: "en",
+      targetLocales: ["de", "ja"],
+      client: integrationClient,
+      model: DEFAULT_MODEL,
+    });
+
+    expect(result.error).toBeUndefined();
+
+    for (const locale of ["de", "ja"]) {
+      const msg = result.data!.messages.find((m: NewMessageNested) => m.locale === locale);
+      expect(msg, `missing ${locale} message`).toBeDefined();
+      const tgtPattern = (msg!.variants[0] as NewVariant | undefined)?.pattern ?? [];
+      expect(tgtPattern, `${locale}: pattern length changed`).toHaveLength(1);
+      expect(tgtPattern[0], `${locale}: expression node mutated`).toEqual({
+        type: "expression",
+        arg: { type: "variable-reference", name: "count" },
+      });
+    }
+  }, 30_000);
+
   it("EDGE: preserves expression nodes (variables) in translated pattern", async () => {
     const project = await loadProjectInMemory({
       blob: await newProject({
