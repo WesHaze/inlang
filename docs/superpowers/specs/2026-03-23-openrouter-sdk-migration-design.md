@@ -10,7 +10,7 @@ Migrate the OpenRouter client abstraction in `packages/cli` from raw `fetch()` w
 
 ## Scope
 
-Three source files change, one package dependency is added, and two test files are rewritten.
+Four source files change, one package dependency is added, and two test files are rewritten.
 
 ## Architecture
 
@@ -42,7 +42,8 @@ Replace the `callOpenRouter` function with an `OpenRouterClient` class.
 
 **Public method:** `complete({ model, messages, temperature? }): Promise<OpenRouterResponse>`
 
-- Calls `client.chat.completions.create(...)`
+- `temperature` defaults to `0.1` inside the method when not provided (preserving current behavior from `callOpenRouter`)
+- Accepts `OpenRouterMessage[]` (`role: "system" | "user"`); casts to `ChatCompletionMessageParam[]` before calling `client.chat.completions.create(...)`
 - Maps the typed SDK response to the existing `OpenRouterResponse` / `OpenRouterUsage` types (both unchanged)
 - Wraps `OpenAI.APIError` into plain `Error` objects so no SDK types leak to callers
 
@@ -52,49 +53,82 @@ Replace the `callOpenRouter` function with an `OpenRouterClient` class.
 
 ### `llmTranslateBundle.ts`
 
-- `LlmTranslateBundleArgs`: replace `openrouterApiKey?: string` with `client: OpenRouterClient`
-- `model` remains on the args (translation concern, not client concern)
-- All internal calls to `callOpenRouter({ apiKey, model, messages, ... })` become `client.complete({ model, messages, ... })`
-- `llmTranslateBundles()` updated identically
-- `MAX_RETRIES = 3` loop for malformed responses: **untouched**
+**`LlmTranslateBundleArgs`:** replace `openrouterApiKey?: string` with `client: OpenRouterClient`. `model` remains on the args. `LlmTranslateBundlesArgs` is `Omit<LlmTranslateBundleArgs, "bundle"> & { bundles: BundleNested[] }` and inherits `client` automatically.
 
-### `translate.ts`
+**`llmTranslateBundle`:**
+- Remove the `apiKey` resolution block (lines 65-68) and the "no API key" early-return — key validation now lives exclusively in `llmTranslateCommandAction`
+- All `callOpenRouter({ apiKey, model, messages, ... })` calls become `args.client.complete({ model, messages })`
+- `siteUrl` / `siteName` are no longer passed here — they are baked into the client at construction time
+- Update the import from `./openrouterClient.js` to remove `OPENROUTER_API_KEY_ENV`, `OPENROUTER_SITE_URL_ENV`, and `OPENROUTER_SITE_NAME_ENV` (no longer used); import `OpenRouterClient` type instead
 
-- Construct `new OpenRouterClient({ apiKey, siteUrl, siteName })` once near the top of the command handler, after resolving the API key from env/option
-- Pass the client instance into `llmTranslateBundles`
-- No logic changes
+**`llmTranslateBundles`:**
+- Remove the `apiKey` resolution block (lines 219-226) and the "no API key" early-return for the same reason
+- All `callOpenRouter(...)` calls become `args.client.complete(...)`
+- Otherwise unchanged
+
+The `MAX_RETRIES = 3` loop for malformed responses in both functions: **untouched**.
+
+### `translate.ts` / `llmTranslateCommandAction`
+
+The API key is resolved and the dry-run guard live inside `llmTranslateCommandAction`. The client must be constructed **inside `llmTranslateCommandAction`**, after the dry-run early-return and after the API key is resolved and validated. This preserves existing behavior where a missing key is only an error when actually making calls.
+
+```
+// inside llmTranslateCommandAction, after the dryRun guard:
+const apiKey = args.apiKey ?? process.env[OPENROUTER_API_KEY_ENV];
+if (!apiKey) throw new Error(`${OPENROUTER_API_KEY_ENV} is required unless --dry-run is used.`);
+const client = new OpenRouterClient({
+  apiKey,
+  siteUrl: process.env[OPENROUTER_SITE_URL_ENV],
+  siteName: process.env[OPENROUTER_SITE_NAME_ENV],
+});
+// replace openrouterApiKey: apiKey with client in llmTranslateBundles(...) call
+```
 
 ## Error handling
 
 - Transport errors (429, 5xx, timeout, network): delegated entirely to the SDK
 - Non-retryable 4xx (401, 404, etc.): SDK throws immediately; caught and re-wrapped as plain `Error`
 - Malformed LLM response: unchanged application-level retry in `llmTranslateBundle.ts`
+- Missing API key: validated once in `llmTranslateCommandAction` before client construction; removed from `llmTranslateBundle` and `llmTranslateBundles`
 
 ## Tests
 
 ### `openrouterClient.test.ts` — rewritten
 
-Mock `openai` SDK's `chat.completions.create`. Coverage:
+Use `vi.mock('openai')` to spy on the `OpenAI` constructor and stub `chat.completions.create`. Coverage:
 
-- Success case with correct usage mapping
-- SDK-level 429: verify the SDK is configured with `maxRetries: 4` (Retry-After delegation, not re-implemented)
-- Non-retryable 4xx: surfaces as plain `Error` with status info
-- Malformed response (empty choices): surfaces as descriptive error
-- Timeout: SDK `APIConnectionTimeoutError` wrapped as plain `Error`
+- Success case with correct usage mapping (including `cachedTokens`, `thinkingTokens`)
+- Retry configuration: assert the `OpenAI` constructor is called with `maxRetries: 4` and `timeout: 60_000` — configuration assertion only; `Retry-After` honoring is delegated to the SDK and not re-tested
+- Non-retryable 4xx: `APIError` with a 4xx status is caught and surfaced as a plain `Error`
+- Malformed response (empty/missing choices): surfaces as a descriptive `Error`
+- Timeout: `APIConnectionTimeoutError` is caught and surfaced as a plain `Error`
 
 ### `llmTranslateBundle.test.ts` — updated
 
-- Construct a mock `OpenRouterClient` with a stubbed `complete()` method
-- Inject directly instead of patching `globalThis.fetch`
-- Same scenario coverage as before
+Integration tests gated on a real API key. Remove any args that include `openrouterApiKey`; replace with a constructed `OpenRouterClient`. The existing "no API key" error path test (`openrouterApiKey: undefined` → expected error) is removed — that validation has moved to `llmTranslateCommandAction` and is covered in `translate.unit.test.ts`.
+
+### `translate.unit.test.ts` — updated
+
+Add a test asserting that `llmTranslateCommandAction` throws (or rejects) with a message matching `OPENROUTER_API_KEY_ENV` when no API key is provided via `args.apiKey` and the env var is unset. This replaces the coverage removed from `llmTranslateBundle.test.ts`.
+
+### `llmTranslateBundleUnit.test.ts` — updated
+
+Currently mocks `callOpenRouter` via `vi.mock("./openrouterClient.js")` and imports `callOpenRouter` as a mock. After migration:
+
+- Change `vi.mock("./openrouterClient.js")` mock to stub `OpenRouterClient.prototype.complete` instead of `callOpenRouter`
+- Update all test args to pass `client: mockClient` (a `new OpenRouterClient(...)` instance, or a plain object matching the interface) instead of `openrouterApiKey`
+- Update all `expect(callOpenRouter).toHaveBeenCalledTimes(n)` assertions to `expect(mockClient.complete).toHaveBeenCalledTimes(n)`
+- Same scenario coverage is retained for both `llmTranslateBundle` and `llmTranslateBundles`
 
 ## Files changed
 
 | File | Change |
 |---|---|
 | `packages/cli/package.json` | Add `openai` dependency |
-| `packages/cli/src/commands/llm/openrouterClient.ts` | Replace function with class |
-| `packages/cli/src/commands/llm/openrouterClient.test.ts` | Rewrite to mock SDK |
-| `packages/cli/src/commands/llm/llmTranslateBundle.ts` | Accept `client` instead of `apiKey` |
-| `packages/cli/src/commands/llm/llmTranslateBundle.test.ts` | Inject mock client |
-| `packages/cli/src/commands/llm/translate.ts` | Construct client, pass down |
+| `packages/cli/src/commands/llm/openrouterClient.ts` | Replace `callOpenRouter` function with `OpenRouterClient` class |
+| `packages/cli/src/commands/llm/openrouterClient.test.ts` | Rewrite to mock SDK via `vi.mock('openai')` |
+| `packages/cli/src/commands/llm/llmTranslateBundle.ts` | Accept `client: OpenRouterClient`; remove internal `apiKey` resolution from both functions |
+| `packages/cli/src/commands/llm/llmTranslateBundle.test.ts` | Replace `openrouterApiKey` with client; remove "no API key" test |
+| `packages/cli/src/commands/llm/llmTranslateBundleUnit.test.ts` | Re-mock `OpenRouterClient.prototype.complete` instead of `callOpenRouter` |
+| `packages/cli/src/commands/llm/translate.ts` | Construct `OpenRouterClient` inside `llmTranslateCommandAction`; pass `client` to `llmTranslateBundles` |
+| `packages/cli/src/commands/llm/translate.unit.test.ts` | Add "no API key" throw test for `llmTranslateCommandAction` |
