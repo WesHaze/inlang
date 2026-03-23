@@ -232,6 +232,9 @@ export async function llmTranslateCommandAction(
         } else if (result.attempted) {
           chunkFailed.push(bundle.id);
         }
+        if (result.failedLocales && result.failedLocales.length > 0) {
+          if (!chunkFailed.includes(bundle.id)) chunkFailed.push(bundle.id);
+        }
       }
       if (!quiet) {
         log.info(`  [batch ${chunkIdx + 1}/${chunks.length}] ${formatUsage(usage)}`);

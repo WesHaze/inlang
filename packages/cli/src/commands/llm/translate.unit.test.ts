@@ -552,6 +552,27 @@ describe("llmTranslateCommandAction — strict mode (failedCount)", () => {
     expect(result.failedCount).toBe(1);
   });
 
+  it("returns failedCount > 0 for bundles that were only partially translated", async () => {
+    const project = await makeProject();
+    await insertBundle(project.db, "greet");
+
+    // translated: true (some locale succeeded) but failedLocales has entries
+    vi.mocked(llmTranslateBundles).mockResolvedValue({
+      results: [{ ...makeMockResult("greet"), translated: true, attempted: true, failedLocales: ["de"] }],
+      usage: emptyUsage,
+    });
+
+    const result = await llmTranslateCommandAction({
+      project,
+      sourceLocale: "en-gb",
+      targetLocales: ["nl", "de"],
+      model: DEFAULT_MODEL,
+      apiKey: "test-key",
+    });
+
+    expect(result.failedCount).toBe(1);
+  });
+
   it("returns failedCount=0 when all bundles are successfully translated", async () => {
     const project = await makeProject();
     await insertBundle(project.db, "greet");

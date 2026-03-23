@@ -653,6 +653,63 @@ describe("llmTranslateBundles — happy path", () => {
   });
 });
 
+describe("llmTranslateBundles — failedLocales tracks partially-failed bundles", () => {
+  it("populates failedLocales for locales that failed validation while others succeeded", async () => {
+    const project = await makeProject(["en-gb", "nl", "de"]);
+    await insertSimpleBundle(project.db, "greet", "Hello");
+    const bundles = await selectBundleNested(project.db).execute();
+    const key = `${bundles[0]!.id}::${bundles[0]!.messages[0]!.variants[0]!.id}`;
+
+    // nl succeeds, de returns wrong-length pattern (fails validation)
+    mockComplete.mockResolvedValue(
+      mockOk(JSON.stringify({
+        [key]: {
+          nl: [{ type: "text", value: "Hallo" }],
+          de: [{ type: "text", value: "Hallo" }, { type: "text", value: "extra" }],
+        },
+      })),
+    );
+
+    const result = await llmTranslateBundles({
+      bundles,
+      sourceLocale: "en-gb",
+      targetLocales: ["nl", "de"],
+      client: mockClient,
+      model: MODEL,
+    });
+
+    expect(result.results[0]!.translated).toBe(true);
+    expect(result.results[0]!.failedLocales).toEqual(["de"]);
+  });
+
+  it("failedLocales is empty when all locales succeed", async () => {
+    const project = await makeProject(["en-gb", "nl", "de"]);
+    await insertSimpleBundle(project.db, "greet", "Hello");
+    const bundles = await selectBundleNested(project.db).execute();
+    const key = `${bundles[0]!.id}::${bundles[0]!.messages[0]!.variants[0]!.id}`;
+
+    mockComplete.mockResolvedValueOnce(
+      mockOk(JSON.stringify({
+        [key]: {
+          nl: [{ type: "text", value: "Hallo" }],
+          de: [{ type: "text", value: "Hallo" }],
+        },
+      })),
+    );
+
+    const result = await llmTranslateBundles({
+      bundles,
+      sourceLocale: "en-gb",
+      targetLocales: ["nl", "de"],
+      client: mockClient,
+      model: MODEL,
+    });
+
+    expect(result.results[0]!.translated).toBe(true);
+    expect(result.results[0]!.failedLocales).toEqual([]);
+  });
+});
+
 describe("llmTranslateBundles — all bundles already translated", () => {
   it("returns early without API call when nothing needs translating", async () => {
     const project = await makeProject(["en-gb", "nl"]);

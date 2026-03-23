@@ -37,8 +37,10 @@ export type LlmTranslateBundleResult = {
   data?: NewBundleNested;
   /** true only when at least one variant was actually written */
   translated?: boolean;
-  /** true when translation was attempted (there was work to do) but nothing got through */
+  /** true when translation was attempted (there was work to do) */
   attempted?: boolean;
+  /** locales that were attempted but could not be translated after all retries */
+  failedLocales?: string[];
   error?: string;
   usage?: OpenRouterUsage;
 };
@@ -227,6 +229,7 @@ export async function llmTranslateBundles(
   const workMap = new Map<string, WorkItem>();
   const bundleErrors = new Map<number, string>(); // copyIdx → error message
   const attemptedIndices = new Set<number>(); // copyIdx values that had work queued
+  const attemptedLocalesByBundle = new Map<number, Set<string>>(); // copyIdx → locales queued for translation
 
   for (let i = 0; i < copies.length; i++) {
     const copy = copies[i]!;
@@ -253,6 +256,9 @@ export async function llmTranslateBundles(
         const variantId = sourceVariant.id ?? randomUUID();
         workMap.set(`${copy.id}::${variantId}`, { copyIdx: i, sourceVariant, targetLocales });
         attemptedIndices.add(i);
+        const localeSet = attemptedLocalesByBundle.get(i) ?? new Set<string>();
+        for (const l of targetLocales) localeSet.add(l);
+        attemptedLocalesByBundle.set(i, localeSet);
       }
     }
   }
@@ -347,6 +353,7 @@ export async function llmTranslateBundles(
 
   // Apply translations back to copies
   const translatedIndices = new Set<number>();
+  const translatedLocalesByBundle = new Map<number, Set<string>>(); // copyIdx → locales successfully written
   for (const [key, { copyIdx, sourceVariant, targetLocales }] of workMap) {
     const copy = copies[copyIdx]!;
     const sourceMessage = copy.messages.find((m) => m.locale === args.sourceLocale)!;
@@ -372,16 +379,22 @@ export async function llmTranslateBundles(
       }
 
       translatedIndices.add(copyIdx);
+      const translatedLocales = translatedLocalesByBundle.get(copyIdx) ?? new Set<string>();
+      translatedLocales.add(targetLocale);
+      translatedLocalesByBundle.set(copyIdx, translatedLocales);
       applyVariantTranslation(copy, sourceMessage, sourceVariant, targetLocale, validation.pattern);
     }
   }
 
   return {
-    results: copies.map((data, i) =>
-      bundleErrors.has(i)
-        ? { error: bundleErrors.get(i) }
-        : { data, translated: translatedIndices.has(i), attempted: attemptedIndices.has(i) },
-    ),
+    results: copies.map((data, i) => {
+      if (bundleErrors.has(i)) return { error: bundleErrors.get(i) };
+      const attempted = attemptedIndices.has(i);
+      const attemptedLocales = attemptedLocalesByBundle.get(i) ?? new Set<string>();
+      const translatedLocales = translatedLocalesByBundle.get(i) ?? new Set<string>();
+      const failedLocales = [...attemptedLocales].filter((l) => !translatedLocales.has(l));
+      return { data, translated: translatedIndices.has(i), attempted, failedLocales };
+    }),
     usage: accumulatedUsage,
   };
 }
