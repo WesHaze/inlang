@@ -7,8 +7,9 @@ import {
 } from "@inlang/sdk";
 import { llmTranslateCommandAction, DEFAULT_MODEL } from "./translate.js";
 import { generateFixtureKeys } from "./fixtures.js";
+import { OPENROUTER_API_KEY_ENV } from "./openrouterClient.js";
 
-test.runIf(process.env.OPENROUTER_API_KEY)(
+test.runIf(process.env[OPENROUTER_API_KEY_ENV])(
   "llmTranslateCommandAction translates fixture keys end-to-end",
   async () => {
     const project = await loadProjectInMemory({

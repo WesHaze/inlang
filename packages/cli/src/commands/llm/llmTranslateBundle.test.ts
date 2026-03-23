@@ -9,18 +9,18 @@ import {
   type Pattern,
 } from "@inlang/sdk";
 import { llmTranslateBundle } from "./llmTranslateBundle.js";
-import { OpenRouterClient } from "./openrouterClient.js";
+import { OpenRouterClient, OPENROUTER_API_KEY_ENV } from "./openrouterClient.js";
 import { generateFixtureKeys } from "./fixtures.js";
 import { DEFAULT_MODEL } from "./translate.js";
 
 // These tests require a real OpenRouter API key.
-// They will be skipped unless OPENROUTER_API_KEY is set.
-const runIf = process.env.OPENROUTER_API_KEY
+// They will be skipped unless INLANG_OPENROUTER_API_KEY is set.
+const runIf = process.env[OPENROUTER_API_KEY_ENV]
   ? describe
   : describe.skip;
 
 runIf("llmTranslateBundle (integration)", () => {
-  const integrationClient = new OpenRouterClient({ apiKey: process.env.OPENROUTER_API_KEY! });
+  const integrationClient = new OpenRouterClient({ apiKey: process.env[OPENROUTER_API_KEY_ENV]! });
 
   it("translates a simple text bundle from en-gb to nl", async () => {
     const project = await loadProjectInMemory({
