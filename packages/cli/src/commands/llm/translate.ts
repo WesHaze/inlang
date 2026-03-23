@@ -18,7 +18,7 @@ import {
   OPENROUTER_SITE_NAME_ENV,
 } from "./openrouterClient.js";
 
-export const DEFAULT_MODEL = "openai/gpt-4o-mini";
+export const DEFAULT_MODEL = "openai/gpt-5-mini";
 
 /** @internal exported for testing */
 export function formatUsage(usage: OpenRouterUsage): string {
