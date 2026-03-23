@@ -1,3 +1,5 @@
+import { OpenRouter } from "@openrouter/sdk";
+
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const MAX_ATTEMPTS = 5;
 const BASE_DELAY_MS = 500;
@@ -24,6 +26,65 @@ export type OpenRouterResponse = {
   content: string;
   usage: OpenRouterUsage;
 };
+
+export class OpenRouterClient {
+  /** Exposed for testing (verify which key was used to construct the client). */
+  readonly apiKey: string;
+  private readonly client: OpenRouter;
+
+  constructor(args: {
+    apiKey: string;
+    siteUrl?: string;
+    siteName?: string;
+  }) {
+    this.apiKey = args.apiKey;
+    const headers: Record<string, string> = {};
+    if (args.siteUrl) headers["HTTP-Referer"] = args.siteUrl;
+    if (args.siteName) headers["X-Title"] = args.siteName;
+
+    this.client = new OpenRouter({
+      apiKey: args.apiKey,
+      headers,
+      maxRetries: 4,
+      timeout: 60_000,
+    });
+  }
+
+  async complete(args: {
+    model: string;
+    messages: OpenRouterMessage[];
+    temperature?: number;
+  }): Promise<OpenRouterResponse> {
+    let result: Awaited<ReturnType<typeof this.client.chat.send>>;
+    try {
+      result = await this.client.chat.send({
+        model: args.model,
+        messages: args.messages as Parameters<typeof this.client.chat.send>[0]["messages"],
+        temperature: args.temperature ?? 0.1,
+      });
+    } catch (err) {
+      const status = (err as { status?: number }).status;
+      throw new Error(
+        `OpenRouter ${status ?? "error"}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+
+    const rawContent = result.choices[0]?.message?.content;
+    const content = typeof rawContent === "string" ? rawContent : "";
+    const u = (result.usage ?? {}) as Record<string, unknown>;
+
+    return {
+      content,
+      usage: {
+        promptTokens: (u["prompt_tokens"] as number) ?? 0,
+        completionTokens: (u["completion_tokens"] as number) ?? 0,
+        cachedTokens: (u["prompt_tokens_details"] as Record<string, unknown>)?.["cached_tokens"] as number ?? 0,
+        thinkingTokens: (u["completion_tokens_details"] as Record<string, unknown>)?.["reasoning_tokens"] as number ?? 0,
+        totalTokens: (u["total_tokens"] as number) ?? 0,
+      },
+    };
+  }
+}
 
 /**
  * Calls the OpenRouter chat completions endpoint with exponential backoff
