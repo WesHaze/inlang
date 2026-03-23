@@ -930,3 +930,96 @@ describe("llmTranslateBundles — bare-array single-locale fallback", () => {
     expect(nl?.variants[0]?.pattern).toEqual([{ type: "text", value: "hallo" }]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// llmTranslateBundle — maxRetries controls attempt count
+// ---------------------------------------------------------------------------
+
+describe("llmTranslateBundle — maxRetries", () => {
+  it("stops after maxRetries=1 attempt when validation keeps failing", async () => {
+    const project = await makeProject(["en-gb", "nl"]);
+    await insertSimpleBundle(project.db, "greet", "Hello");
+    const [bundle] = await selectBundleNested(project.db).execute();
+
+    // Always returns a pattern with wrong length — triggers validation failure
+    mockComplete.mockResolvedValue(
+      mockOk(JSON.stringify({ nl: [{ type: "text", value: "Hallo" }, { type: "text", value: "extra" }] })),
+    );
+
+    await llmTranslateBundle({
+      bundle: bundle!,
+      sourceLocale: "en-gb",
+      targetLocales: ["nl"],
+      client: mockClient,
+      model: MODEL,
+      maxRetries: 1,
+    });
+
+    expect(mockComplete).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops after maxRetries=2 attempts when validation keeps failing", async () => {
+    const project = await makeProject(["en-gb", "nl"]);
+    await insertSimpleBundle(project.db, "greet", "Hello");
+    const [bundle] = await selectBundleNested(project.db).execute();
+
+    mockComplete.mockResolvedValue(
+      mockOk(JSON.stringify({ nl: [{ type: "text", value: "Hallo" }, { type: "text", value: "extra" }] })),
+    );
+
+    await llmTranslateBundle({
+      bundle: bundle!,
+      sourceLocale: "en-gb",
+      targetLocales: ["nl"],
+      client: mockClient,
+      model: MODEL,
+      maxRetries: 2,
+    });
+
+    expect(mockComplete).toHaveBeenCalledTimes(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// llmTranslateBundles — maxRetries controls attempt count
+// ---------------------------------------------------------------------------
+
+describe("llmTranslateBundles — maxRetries", () => {
+  it("stops after maxRetries=1 attempt when JSON parse keeps failing", async () => {
+    const project = await makeProject(["en-gb", "nl"]);
+    await insertSimpleBundle(project.db, "greet", "Hello");
+    const bundles = await selectBundleNested(project.db).execute();
+
+    mockComplete.mockResolvedValue(mockOk("not valid json"));
+
+    await llmTranslateBundles({
+      bundles,
+      sourceLocale: "en-gb",
+      targetLocales: ["nl"],
+      client: mockClient,
+      model: MODEL,
+      maxRetries: 1,
+    });
+
+    expect(mockComplete).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops after maxRetries=2 attempts when JSON parse keeps failing", async () => {
+    const project = await makeProject(["en-gb", "nl"]);
+    await insertSimpleBundle(project.db, "greet", "Hello");
+    const bundles = await selectBundleNested(project.db).execute();
+
+    mockComplete.mockResolvedValue(mockOk("not valid json"));
+
+    await llmTranslateBundles({
+      bundles,
+      sourceLocale: "en-gb",
+      targetLocales: ["nl"],
+      client: mockClient,
+      model: MODEL,
+      maxRetries: 2,
+    });
+
+    expect(mockComplete).toHaveBeenCalledTimes(2);
+  });
+});

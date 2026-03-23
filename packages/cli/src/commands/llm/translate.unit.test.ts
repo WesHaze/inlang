@@ -528,6 +528,113 @@ describe("llmTranslateCommandAction — result aggregation", () => {
 });
 
 // ---------------------------------------------------------------------------
+// --strict flag — failedCount returned
+// ---------------------------------------------------------------------------
+
+describe("llmTranslateCommandAction — strict mode (failedCount)", () => {
+  it("returns failedCount > 0 when bundles were attempted but not fully translated", async () => {
+    const project = await makeProject();
+    await insertBundle(project.db, "greet");
+
+    vi.mocked(llmTranslateBundles).mockResolvedValue({
+      results: [{ ...makeMockResult("greet"), attempted: true }],
+      usage: emptyUsage,
+    });
+
+    const result = await llmTranslateCommandAction({
+      project,
+      sourceLocale: "en-gb",
+      targetLocales: ["nl"],
+      model: DEFAULT_MODEL,
+      apiKey: "test-key",
+    });
+
+    expect(result.failedCount).toBe(1);
+  });
+
+  it("returns failedCount=0 when all bundles are successfully translated", async () => {
+    const project = await makeProject();
+    await insertBundle(project.db, "greet");
+
+    vi.mocked(llmTranslateBundles).mockResolvedValue({
+      results: [{ ...makeMockResult("greet"), translated: true }],
+      usage: emptyUsage,
+    });
+
+    const result = await llmTranslateCommandAction({
+      project,
+      sourceLocale: "en-gb",
+      targetLocales: ["nl"],
+      model: DEFAULT_MODEL,
+      apiKey: "test-key",
+    });
+
+    expect(result.failedCount).toBe(0);
+  });
+
+  it("returns failedCount=0 when bundles have no work (already translated or no target locales)", async () => {
+    const project = await makeProject();
+    await insertBundle(project.db, "greet");
+
+    vi.mocked(llmTranslateBundles).mockResolvedValue({
+      results: [makeMockResult("greet")], // no translated, no attempted — nothing to do
+      usage: emptyUsage,
+    });
+
+    const result = await llmTranslateCommandAction({
+      project,
+      sourceLocale: "en-gb",
+      targetLocales: ["nl"],
+      model: DEFAULT_MODEL,
+      apiKey: "test-key",
+    });
+
+    expect(result.failedCount).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// --max-retries forwarded
+// ---------------------------------------------------------------------------
+
+describe("llmTranslateCommandAction — maxRetries forwarded", () => {
+  it("passes maxRetries to llmTranslateBundles when provided", async () => {
+    const project = await makeProject();
+    await insertBundle(project.db, "greet");
+
+    vi.mocked(llmTranslateBundles).mockResolvedValue({ results: [makeMockResult("greet")], usage: emptyUsage });
+
+    await llmTranslateCommandAction({
+      project,
+      sourceLocale: "en-gb",
+      targetLocales: ["nl"],
+      model: DEFAULT_MODEL,
+      apiKey: "test-key",
+      maxRetries: 5,
+    });
+
+    expect(vi.mocked(llmTranslateBundles).mock.calls[0]![0].maxRetries).toBe(5);
+  });
+
+  it("passes default maxRetries of 3 when not provided", async () => {
+    const project = await makeProject();
+    await insertBundle(project.db, "greet");
+
+    vi.mocked(llmTranslateBundles).mockResolvedValue({ results: [makeMockResult("greet")], usage: emptyUsage });
+
+    await llmTranslateCommandAction({
+      project,
+      sourceLocale: "en-gb",
+      targetLocales: ["nl"],
+      model: DEFAULT_MODEL,
+      apiKey: "test-key",
+    });
+
+    expect(vi.mocked(llmTranslateBundles).mock.calls[0]![0].maxRetries).toBe(3);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // token usage reporting in log output
 // ---------------------------------------------------------------------------
 

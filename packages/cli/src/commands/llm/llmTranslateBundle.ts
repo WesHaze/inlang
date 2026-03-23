@@ -21,6 +21,7 @@ export type LlmTranslateBundleArgs = {
   context?: string;
   force?: boolean;
   quiet?: boolean;
+  maxRetries?: number;
 };
 
 export type LlmTranslateBundlesArgs = Omit<LlmTranslateBundleArgs, "bundle"> & {
@@ -127,10 +128,11 @@ export async function llmTranslateBundle(
   };
   let anyTranslated = false;
 
+  const maxRetries = args.maxRetries ?? MAX_RETRIES;
   for (const { sourceVariant, targetLocales } of work.values()) {
     let remainingLocales = [...targetLocales];
 
-    for (let attempt = 0; attempt < MAX_RETRIES && remainingLocales.length > 0; attempt++) {
+    for (let attempt = 0; attempt < maxRetries && remainingLocales.length > 0; attempt++) {
       if (attempt > 0) {
         await sleep(RETRY_BASE_MS * 2 ** (attempt - 1));
       }
@@ -178,14 +180,14 @@ export async function llmTranslateBundle(
         }
         if (typeof normalized !== "object" || normalized === null || Array.isArray(normalized)) {
           if (!args.quiet) log.warn(
-            `${LOG_PREFIX} Bundle "${args.bundle.id}" (attempt ${attempt + 1}/${MAX_RETRIES}): LLM response was not a JSON object${attempt < MAX_RETRIES - 1 ? ", retrying..." : ", skipping variant"}`,
+            `${LOG_PREFIX} Bundle "${args.bundle.id}" (attempt ${attempt + 1}/${maxRetries}): LLM response was not a JSON object${attempt < maxRetries - 1 ? ", retrying..." : ", skipping variant"}`,
           );
           continue;
         }
         translationsMap = normalized as Record<string, unknown>;
       } catch {
         if (!args.quiet) log.warn(
-          `${LOG_PREFIX} Bundle "${args.bundle.id}" (attempt ${attempt + 1}/${MAX_RETRIES}): failed to parse LLM response as JSON${attempt < MAX_RETRIES - 1 ? ", retrying..." : ", skipping variant"}`,
+          `${LOG_PREFIX} Bundle "${args.bundle.id}" (attempt ${attempt + 1}/${maxRetries}): failed to parse LLM response as JSON${attempt < maxRetries - 1 ? ", retrying..." : ", skipping variant"}`,
         );
         continue;
       }
@@ -198,7 +200,7 @@ export async function llmTranslateBundle(
 
         if (!validation.valid) {
           if (!args.quiet) log.warn(
-            `${LOG_PREFIX} Bundle "${args.bundle.id}" → ${targetLocale} (attempt ${attempt + 1}/${MAX_RETRIES}): ${validation.error}${attempt < MAX_RETRIES - 1 ? ", retrying..." : ", skipping"}`,
+            `${LOG_PREFIX} Bundle "${args.bundle.id}" → ${targetLocale} (attempt ${attempt + 1}/${maxRetries}): ${validation.error}${attempt < maxRetries - 1 ? ", retrying..." : ", skipping"}`,
           );
           nextRemainingLocales.push(targetLocale);
           continue;
@@ -288,10 +290,11 @@ export async function llmTranslateBundles(
     .join("\n")
     .trim();
 
+  const maxRetries = args.maxRetries ?? MAX_RETRIES;
   const accumulatedUsage = emptyUsage();
   let translationsMap: Record<string, Record<string, unknown>> | undefined;
 
-  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
     if (attempt > 0) await sleep(RETRY_BASE_MS * 2 ** (attempt - 1));
 
     let response;
@@ -319,16 +322,16 @@ export async function llmTranslateBundles(
     try {
       parsed = extractJson(response.content);
     } catch {
-      if (attempt < MAX_RETRIES - 1) {
-        if (!args.quiet) log.warn(`${LOG_PREFIX} batch: failed to parse LLM response as JSON (attempt ${attempt + 1}/${MAX_RETRIES}), retrying...`);
+      if (attempt < maxRetries - 1) {
+        if (!args.quiet) log.warn(`${LOG_PREFIX} batch: failed to parse LLM response as JSON (attempt ${attempt + 1}/${maxRetries}), retrying...`);
         continue;
       }
       return { results: args.bundles.map(() => ({ error: "Failed to parse LLM batch response as JSON after all retries" })), usage: accumulatedUsage };
     }
 
     if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-      if (attempt < MAX_RETRIES - 1) {
-        if (!args.quiet) log.warn(`${LOG_PREFIX} batch: LLM response was not a JSON object (attempt ${attempt + 1}/${MAX_RETRIES}), retrying...`);
+      if (attempt < maxRetries - 1) {
+        if (!args.quiet) log.warn(`${LOG_PREFIX} batch: LLM response was not a JSON object (attempt ${attempt + 1}/${maxRetries}), retrying...`);
         continue;
       }
       return { results: args.bundles.map(() => ({ error: "LLM returned non-object batch response after all retries" })), usage: accumulatedUsage };

@@ -54,6 +54,8 @@ This translates all bundles that are missing a translation for any locale define
 | `--batch-size <n>` | `10` | Number of bundles per LLM call |
 | `--force` | false | Overwrite existing non-empty translations |
 | `--dry-run` | false | Preview what would be translated without writing or calling the API |
+| `--strict` | false | Exit with code 1 if any bundles could not be fully translated (e.g. LLM validation failed). Useful for failing CI/CD pipelines when translations are incomplete. |
+| `--max-retries <n>` | `3` | Maximum LLM validation retry attempts per variant/batch. Increase if the LLM frequently returns malformed responses; decrease to fail faster. |
 | `-q, --quiet` | false | Suppress per-batch token log lines |
 | `--api-key <key>` | — | OpenRouter API key. Overrides `INLANG_OPENROUTER_API_KEY` env var. |
 
@@ -125,6 +127,34 @@ npx @inlang/cli llm translate --project ./project.inlang \
 
 ---
 
+## CI/CD pipelines
+
+### Failing the pipeline when translations are incomplete
+
+By default the command exits 0 if the LLM translated everything it attempted, and exits 1 only on hard errors (API failures, upsert errors). Use `--strict` to also fail when any bundle could not be fully translated — for example because the LLM returned malformed output that didn't pass validation after all retries:
+
+```bash
+npx @inlang/cli llm translate --project ./project.inlang --strict
+```
+
+Bundles that could not be translated are listed in the output so you can investigate them.
+
+### Tuning retry behaviour
+
+Use `--max-retries` to control how many times the command re-tries a failed LLM call before giving up:
+
+```bash
+# Fail faster — only 1 attempt per batch
+npx @inlang/cli llm translate --project ./project.inlang --max-retries 1
+
+# Be more patient — up to 5 attempts
+npx @inlang/cli llm translate --project ./project.inlang --max-retries 5
+```
+
+The default is 3. Retries use exponential backoff (500 ms, 1 s, 2 s, …).
+
+---
+
 ## How it works
 
 *This section is for contributors and anyone curious about the internals.*
@@ -133,5 +163,5 @@ npx @inlang/cli llm translate --project ./project.inlang \
 2. Each chunk is passed to `llmTranslateBundles`, which sends the entire chunk as a single LLM call via OpenRouter. The request payload is a JSON object keyed by `bundleId::variantId`, where each entry is `{ pattern: [...], targetLocales: [...] }`. The LLM is expected to return `{ "bundleId::variantId": { "locale": [...pattern...] } }`.
 3. The LLM is instructed to translate only the `"value"` field of nodes where `"type"` is `"text"`. All other node types (`expression`, `markup-start`, `markup-end`, `markup-standalone`) must be returned exactly as given — this preserves variables and markup in translated strings.
 4. In `llmTranslateBundles` (the function the command uses), each locale's translated pattern is validated: it must be a JSON array, all non-text nodes must deep-equal their source counterparts, and text nodes that were non-empty in the source must remain non-empty. If a locale's pattern fails validation, only that locale-variant combination is skipped with a warning; other valid locales in the same bundle are still applied.
-5. If the LLM returns unparseable JSON or a non-object response, or if the request fails due to a network error or timeout, the entire batch retries up to 3 total attempts with exponential backoff.
+5. If the LLM returns unparseable JSON or a non-object response, or if the request fails due to a network error or timeout, the entire batch retries up to `--max-retries` total attempts (default 3) with exponential backoff.
 6. The HTTP client separately retries on HTTP 429, 5xx, network errors, and request timeouts — up to 5 total attempts with exponential backoff.

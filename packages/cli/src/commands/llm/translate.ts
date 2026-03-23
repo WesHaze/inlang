@@ -59,6 +59,17 @@ export const translate = new Command()
   .option("--force", "Overwrite existing translations.", false)
   .option("--dry-run", "Preview translation plan. Skips API key check and makes no API calls.", false)
   .option("-q, --quiet", "Suppress per-bundle logging.", false)
+  .option("--strict", "Exit with code 1 if any bundles could not be fully translated.", false)
+  .option(
+    "--max-retries <n>",
+    "Maximum LLM validation retry attempts per variant/batch.",
+    (v) => {
+      const n = parseInt(v, 10);
+      if (isNaN(n) || n < 1) throw new Error(`--max-retries must be a positive integer, got: "${v}"`);
+      return n;
+    },
+    3,
+  )
   .option("--api-key <key>", "OpenRouter API key (overrides INLANG_OPENROUTER_API_KEY env var).")
   .description("Translate bundles using an LLM via OpenRouter.")
   .action(async (args: { project: string }) => {
@@ -90,7 +101,7 @@ export const translate = new Command()
         }
       }
 
-      const { successCount, errorCount } = await llmTranslateCommandAction({
+      const { successCount, errorCount, failedCount } = await llmTranslateCommandAction({
         project,
         sourceLocale,
         targetLocales,
@@ -101,6 +112,8 @@ export const translate = new Command()
         force: options.force,
         dryRun: options.dryRun,
         quiet: options.quiet,
+        strict: options.strict,
+        maxRetries: options.maxRetries,
       });
 
       if (!options.dryRun) {
@@ -108,6 +121,7 @@ export const translate = new Command()
           await saveProjectToDirectory({ fs, path: args.project, project });
         }
         if (errorCount > 0) exitCode = 1;
+        if (options.strict && failedCount > 0) exitCode = 1;
       }
     } catch (error) {
       logError(error);
@@ -128,11 +142,13 @@ export type LlmTranslateCommandActionArgs = {
   force?: boolean;
   dryRun?: boolean;
   quiet?: boolean;
+  strict?: boolean;
+  maxRetries?: number;
 };
 
 export async function llmTranslateCommandAction(
   args: LlmTranslateCommandActionArgs,
-): Promise<{ successCount: number; errorCount: number }> {
+): Promise<{ successCount: number; errorCount: number; failedCount: number }> {
   const {
     project,
     sourceLocale,
@@ -142,6 +158,7 @@ export async function llmTranslateCommandAction(
     force = false,
     dryRun = false,
     quiet = false,
+    maxRetries = 3,
   } = args;
 
   const targetLocales = [...new Set(args.targetLocales.map((s) => s.trim()).filter(Boolean))];
@@ -152,7 +169,7 @@ export async function llmTranslateCommandAction(
     log.warn(
       "No bundles found. Check your project setup with `inlang validate`.",
     );
-    return { successCount: 0, errorCount: 0 };
+    return { successCount: 0, errorCount: 0, failedCount: 0 };
   }
 
   // Validate source locale exists in at least one bundle
@@ -169,7 +186,7 @@ export async function llmTranslateCommandAction(
     log.info(
       `Dry run: would translate ${bundles.length} bundle(s) in batches of ${batchSize} from "${sourceLocale}" to [${targetLocales.join(", ")}] using model "${model}".`,
     );
-    return { successCount: 0, errorCount: 0 };
+    return { successCount: 0, errorCount: 0, failedCount: 0 };
   }
 
   const apiKey = args.apiKey ?? process.env[OPENROUTER_API_KEY_ENV];
@@ -190,7 +207,7 @@ export async function llmTranslateCommandAction(
 
   const chunkResults = await Promise.all(
     chunks.map(async (chunk, chunkIdx) => {
-      const { results, usage } = await llmTranslateBundles({ bundles: chunk, sourceLocale, targetLocales, model, client, context, force, quiet });
+      const { results, usage } = await llmTranslateBundles({ bundles: chunk, sourceLocale, targetLocales, model, client, context, force, quiet, maxRetries });
       let chunkSuccess = 0;
       let chunkErrors = 0;
       const chunkFailed: string[] = [];
@@ -233,6 +250,7 @@ export async function llmTranslateCommandAction(
   const successCount = chunkResults.reduce((sum, r) => sum + r.successCount, 0);
   const errorCount = chunkResults.reduce((sum, r) => sum + r.errorCount, 0);
   const failedIds = chunkResults.flatMap((r) => r.failedIds);
+  const failedCount = failedIds.length;
 
   log.success(
     `LLM translate complete. ${successCount} bundle(s) translated, ${errorCount} error(s). ${formatUsage(totalUsage)} used.`,
@@ -244,5 +262,5 @@ export async function llmTranslateCommandAction(
     );
   }
 
-  return { successCount, errorCount };
+  return { successCount, errorCount, failedCount };
 }
