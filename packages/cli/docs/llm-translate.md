@@ -56,7 +56,7 @@ This translates all bundles that are missing a translation for any locale define
 | `--dry-run` | false | Preview what would be translated without writing or calling the API |
 | `--strict` | false | Exit with code 1 if any bundles could not be fully translated (e.g. LLM validation failed). Useful for failing CI/CD pipelines when translations are incomplete. |
 | `--max-retries <n>` | `3` | Maximum LLM validation retry attempts per variant/batch. Increase if the LLM frequently returns malformed responses; decrease to fail faster. |
-| `-q, --quiet` | false | Suppress per-batch token log lines |
+| `-q, --quiet` | false | Suppress per-bundle and per-batch log output (warnings, retries, and token usage lines) |
 | `--api-key <key>` | — | OpenRouter API key. Overrides `INLANG_OPENROUTER_API_KEY` env var. |
 
 ---
