@@ -129,6 +129,27 @@ export async function llmTranslateCommandAction(
     return { successCount: 0, errorCount: 0 };
   }
 
+  // Validate source locale exists in at least one bundle
+  const hasSourceLocale = bundles.some((b) =>
+    b.messages.some((m) => m.locale === sourceLocale),
+  );
+  if (!hasSourceLocale) {
+    throw new Error(
+      `Source locale "${sourceLocale}" has no messages in this project. Check --locale or your project settings.`,
+    );
+  }
+
+  // Warn about target locales that are not in the project's locale list
+  const settings = await project.settings.get();
+  const projectLocales = new Set(settings.locales as string[]);
+  for (const locale of targetLocales) {
+    if (!projectLocales.has(locale)) {
+      log.warn(
+        `Target locale "${locale}" is not in the project's locales array. It will be created but may not be picked up by your app.`,
+      );
+    }
+  }
+
   if (dryRun) {
     log.info(
       `Dry run: would translate ${bundles.length} bundle(s) in batches of ${batchSize} from "${sourceLocale}" to [${targetLocales.join(", ")}] using model "${model}".`,
