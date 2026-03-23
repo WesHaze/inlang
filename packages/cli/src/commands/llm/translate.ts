@@ -173,28 +173,25 @@ export async function llmTranslateCommandAction(
     chunks.push(bundles.slice(i, i + batchSize));
   }
 
-  let totalTokens = 0;
-  let successCount = 0;
-  let errorCount = 0;
-
-  await Promise.all(
+  const chunkResults = await Promise.all(
     chunks.map(async (chunk, chunkIdx) => {
       const { results, usage } = await llmTranslateBundles({ bundles: chunk, sourceLocale, targetLocales, model, client, context, force, quiet });
-      totalTokens += usage.totalTokens;
+      let chunkSuccess = 0;
+      let chunkErrors = 0;
       for (let i = 0; i < results.length; i++) {
         const result = results[i]!;
         const bundle = chunk[i]!;
         if (result.error) {
-          errorCount++;
+          chunkErrors++;
           log.warn(`  [${bundle.id}] error: ${result.error}`);
           continue;
         }
         if (result.data) {
           try {
             await upsertBundleNested(project.db, result.data);
-            if (result.translated) successCount++;
+            if (result.translated) chunkSuccess++;
           } catch (upsertErr) {
-            errorCount++;
+            chunkErrors++;
             log.warn(
               `  [${bundle.id}] failed to upsert: ${upsertErr instanceof Error ? upsertErr.message : String(upsertErr)}`,
             );
@@ -204,8 +201,13 @@ export async function llmTranslateCommandAction(
       if (!quiet) {
         log.info(`  [batch ${chunkIdx + 1}/${chunks.length}] ${usage.totalTokens} tokens`);
       }
+      return { tokens: usage.totalTokens, successCount: chunkSuccess, errorCount: chunkErrors };
     }),
   );
+
+  const totalTokens = chunkResults.reduce((sum, r) => sum + r.tokens, 0);
+  const successCount = chunkResults.reduce((sum, r) => sum + r.successCount, 0);
+  const errorCount = chunkResults.reduce((sum, r) => sum + r.errorCount, 0);
 
   log.success(
     `LLM translate complete. ${successCount} bundle(s) translated, ${errorCount} error(s). Total tokens used: ${totalTokens}.`,

@@ -432,3 +432,41 @@ describe("llmTranslateCommandAction — targetLocales normalization", () => {
     expect(dispatched).toEqual(["nl"]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// result aggregation across chunks
+// ---------------------------------------------------------------------------
+
+describe("llmTranslateCommandAction — result aggregation", () => {
+  it("sums successCount and errorCount across chunks", async () => {
+    const project = await makeProject();
+    await insertBundle(project.db, "a");
+    await insertBundle(project.db, "b");
+    await insertBundle(project.db, "c");
+
+    vi.mocked(llmTranslateBundles)
+      .mockResolvedValueOnce({
+        results: [
+          { ...makeMockResult("a"), translated: true },
+          { error: "boom" },
+        ],
+        usage: { ...emptyUsage, totalTokens: 10 },
+      })
+      .mockResolvedValueOnce({
+        results: [{ ...makeMockResult("c"), translated: true }],
+        usage: { ...emptyUsage, totalTokens: 5 },
+      });
+
+    const result = await llmTranslateCommandAction({
+      project,
+      sourceLocale: "en-gb",
+      targetLocales: ["nl"],
+      model: DEFAULT_MODEL,
+      apiKey: "test-key",
+      batchSize: 2,
+    });
+
+    expect(result.successCount).toBe(2);
+    expect(result.errorCount).toBe(1);
+  });
+});
