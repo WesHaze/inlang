@@ -168,7 +168,7 @@ export async function llmTranslateCommandAction(
 
   const batchResults = await Promise.all(
     chunks.map((chunk, chunkIdx) =>
-      llmTranslateBundles({ bundles: chunk, sourceLocale, targetLocales, model, openrouterApiKey: apiKey, context, force })
+      llmTranslateBundles({ bundles: chunk, sourceLocale, targetLocales, model, openrouterApiKey: apiKey, context, force, quiet })
         .then(async ({ results, usage }) => {
           totalTokens += usage.totalTokens;
           await Promise.all(

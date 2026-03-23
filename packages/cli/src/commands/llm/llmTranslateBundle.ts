@@ -18,6 +18,7 @@ export type LlmTranslateBundleArgs = {
   model: string;
   context?: string;
   force?: boolean;
+  quiet?: boolean;
 };
 
 export type LlmTranslateBundlesArgs = Omit<LlmTranslateBundleArgs, "bundle"> & {
@@ -161,14 +162,14 @@ export async function llmTranslateBundle(
       try {
         const parsed = JSON.parse(response.content) as unknown;
         if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-          console.warn(
+          if (!args.quiet) console.warn(
             `[llm-translate] Bundle "${args.bundle.id}" (attempt ${attempt + 1}/${MAX_RETRIES}): LLM response was not a JSON object${attempt < MAX_RETRIES - 1 ? ", retrying..." : ", skipping variant"}`,
           );
           continue;
         }
         translationsMap = parsed as Record<string, unknown>;
       } catch {
-        console.warn(
+        if (!args.quiet) console.warn(
           `[llm-translate] Bundle "${args.bundle.id}" (attempt ${attempt + 1}/${MAX_RETRIES}): failed to parse LLM response as JSON${attempt < MAX_RETRIES - 1 ? ", retrying..." : ", skipping variant"}`,
         );
         continue;
@@ -183,7 +184,7 @@ export async function llmTranslateBundle(
         );
 
         if (!validation.valid) {
-          console.warn(
+          if (!args.quiet) console.warn(
             `[llm-translate] Bundle "${args.bundle.id}" → ${targetLocale} (attempt ${attempt + 1}/${MAX_RETRIES}): ${validation.error}${attempt < MAX_RETRIES - 1 ? ", retrying..." : ", skipping"}`,
           );
           nextRemainingLocales.push(targetLocale);
@@ -354,7 +355,7 @@ export async function llmTranslateBundles(
       parsed = JSON.parse(response.content);
     } catch {
       if (attempt < MAX_RETRIES - 1) {
-        console.warn(`[llm-translate] batch: failed to parse LLM response as JSON (attempt ${attempt + 1}/${MAX_RETRIES}), retrying...`);
+        if (!args.quiet) console.warn(`[llm-translate] batch: failed to parse LLM response as JSON (attempt ${attempt + 1}/${MAX_RETRIES}), retrying...`);
         continue;
       }
       return { results: args.bundles.map(() => ({ error: "Failed to parse LLM batch response as JSON after all retries" })), usage: accumulatedUsage };
@@ -362,7 +363,7 @@ export async function llmTranslateBundles(
 
     if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
       if (attempt < MAX_RETRIES - 1) {
-        console.warn(`[llm-translate] batch: LLM response was not a JSON object (attempt ${attempt + 1}/${MAX_RETRIES}), retrying...`);
+        if (!args.quiet) console.warn(`[llm-translate] batch: LLM response was not a JSON object (attempt ${attempt + 1}/${MAX_RETRIES}), retrying...`);
         continue;
       }
       return { results: args.bundles.map(() => ({ error: "LLM returned non-object batch response after all retries" })), usage: accumulatedUsage };
@@ -393,7 +394,7 @@ export async function llmTranslateBundles(
           : (localeMap as Record<string, unknown>)[targetLocale];
       const validation = validateTranslatedPattern(sourceVariant.pattern ?? [], rawPattern);
       if (!validation.valid) {
-        console.warn(`[llm-translate] Bundle "${copy.id}" → ${targetLocale}: ${validation.error}, skipping`);
+        if (!args.quiet) console.warn(`[llm-translate] Bundle "${copy.id}" → ${targetLocale}: ${validation.error}, skipping`);
         continue;
       }
 
