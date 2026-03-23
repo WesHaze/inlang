@@ -51,6 +51,20 @@ function serializeVariants(
   }
 
   const selector = selectors[nextSelectorIndex]!;
+  const pairedPluralSelector = selectors[nextSelectorIndex + 1];
+  const pluralSelectorPair = pairedPluralSelector
+    ? resolvePluralSelectorPair(selector, pairedPluralSelector, declarations)
+    : undefined;
+  if (pluralSelectorPair) {
+    return serializePluralSelectorPair(
+      variants,
+      selectors.slice(nextSelectorIndex + 2),
+      declarations,
+      inPlural,
+      pluralSelectorPair,
+    );
+  }
+
   const restSelectors = selectors.slice(nextSelectorIndex + 1);
   const selectorConfig = resolveSelectorConfig(selector, declarations);
   const isPluralContext = selectorConfig.type !== "select";
@@ -137,6 +151,19 @@ function removeMatchForSelector(
   };
 }
 
+function removeMatchesForSelectors(
+  variant: Variant,
+  selectorNames: string[],
+): Variant {
+  const selectorNameSet = new Set(selectorNames);
+  return {
+    ...variant,
+    matches: variant.matches.filter(
+      (entry: Variant["matches"][number]) => !selectorNameSet.has(entry.key),
+    ),
+  };
+}
+
 function resolveSelectorConfig(
   selector: VariableReference,
   declarations: Declaration[],
@@ -174,6 +201,183 @@ function resolveSelectorConfig(
     type: "select",
     arg: selector.name,
   };
+}
+
+function resolvePluralSelectorPair(
+  firstSelector: VariableReference,
+  secondSelector: VariableReference,
+  declarations: Declaration[],
+):
+  | {
+      exactSelector: VariableReference;
+      pluralSelector: VariableReference;
+      config: {
+        type: "plural" | "selectordinal";
+        arg: string;
+        offset?: number;
+      };
+    }
+  | undefined {
+  return (
+    tryResolvePluralSelectorPair(
+      firstSelector,
+      secondSelector,
+      declarations,
+    ) ??
+    tryResolvePluralSelectorPair(
+      secondSelector,
+      firstSelector,
+      declarations,
+    )
+  );
+}
+
+function tryResolvePluralSelectorPair(
+  exactSelector: VariableReference,
+  pluralSelector: VariableReference,
+  declarations: Declaration[],
+):
+  | {
+      exactSelector: VariableReference;
+      pluralSelector: VariableReference;
+      config: {
+        type: "plural" | "selectordinal";
+        arg: string;
+        offset?: number;
+      };
+    }
+  | undefined {
+  const exactDeclaration = declarations.find(
+    (declaration) =>
+      declaration.type === "local-variable" &&
+      declaration.name === exactSelector.name,
+  );
+  const pluralConfig = resolveSelectorConfig(pluralSelector, declarations);
+
+  if (
+    pluralConfig.type !== "plural" &&
+    pluralConfig.type !== "selectordinal"
+  ) {
+    return undefined;
+  }
+
+  if (
+    !exactDeclaration ||
+    exactDeclaration.type !== "local-variable" ||
+    exactDeclaration.value.annotation !== undefined ||
+    exactDeclaration.value.arg.type !== "variable-reference" ||
+    exactDeclaration.value.arg.name !== pluralConfig.arg
+  ) {
+    return undefined;
+  }
+
+  return {
+    exactSelector,
+    pluralSelector,
+    config: pluralConfig as {
+      type: "plural" | "selectordinal";
+      arg: string;
+      offset?: number;
+    },
+  };
+}
+
+function serializePluralSelectorPair(
+  variants: Variant[],
+  selectors: VariableReference[],
+  declarations: Declaration[],
+  inPlural: boolean,
+  pair: {
+    exactSelector: VariableReference;
+    pluralSelector: VariableReference;
+    config: {
+      type: "plural" | "selectordinal";
+      arg: string;
+      offset?: number;
+    };
+  },
+): string {
+  const patterns = variants.map((variant) => variant.pattern);
+  const minPatternLength = Math.min(
+    ...patterns.map((pattern) => pattern.length),
+  );
+
+  const rawPrefix = commonPrefix(
+    variants.map((variant) => variant.pattern),
+    true,
+  );
+  const prefixLength =
+    rawPrefix.length >= minPatternLength ? 0 : rawPrefix.length;
+  const patternsWithoutPrefix = patterns.map((pattern) =>
+    pattern.slice(prefixLength),
+  );
+  const rawSuffix = commonSuffix(patternsWithoutPrefix, true);
+  const suffixLength =
+    rawSuffix.length >= minPatternLength - prefixLength ? 0 : rawSuffix.length;
+  const prefix = prefixLength === 0 ? [] : rawPrefix;
+  const suffix = suffixLength === 0 ? [] : rawSuffix;
+  const strippedVariants = variants.map((variant) => ({
+    ...variant,
+    pattern: stripPattern(variant.pattern, prefixLength, suffixLength),
+  }));
+
+  const groups = new Map<string, Variant[]>();
+  for (const variant of strippedVariants) {
+    const exactMatch = variant.matches.find(
+      (entry: Variant["matches"][number]) => entry.key === pair.exactSelector.name,
+    );
+    const pluralMatch = variant.matches.find(
+      (entry: Variant["matches"][number]) => entry.key === pair.pluralSelector.name,
+    );
+    const key = pluralPairCaseKey(exactMatch, pluralMatch);
+    const current = groups.get(key) ?? [];
+    current.push(
+      removeMatchesForSelectors(variant, [
+        pair.exactSelector.name,
+        pair.pluralSelector.name,
+      ]),
+    );
+    groups.set(key, current);
+  }
+
+  const cases = Array.from(groups.entries())
+    .sort(([left], [right]) => pluralCasePriority(left) - pluralCasePriority(right))
+    .map(([key, groupVariants]) => {
+      const tokens = serializeVariants(groupVariants, selectors, declarations, true);
+      return `${key} {${tokens}}`;
+    });
+
+  let header = `${pair.config.arg}, ${pair.config.type},`;
+  if (pair.config.offset && pair.config.offset !== 0) {
+    header += ` offset:${pair.config.offset}`;
+  }
+
+  const select = `{${header} ${cases.join(" ")}}`;
+
+  return [
+    serializePattern(prefix, { inPlural }),
+    select,
+    serializePattern(suffix, { inPlural }),
+  ].join("");
+}
+
+function pluralPairCaseKey(
+  exactMatch: Variant["matches"][number] | undefined,
+  pluralMatch: Variant["matches"][number] | undefined,
+): string {
+  if (exactMatch?.type === "literal-match") {
+    return `=${exactMatch.value}`;
+  }
+  if (pluralMatch?.type === "literal-match") {
+    return pluralMatch.value;
+  }
+  return "other";
+}
+
+function pluralCasePriority(key: string): number {
+  if (key.startsWith("=")) return 0;
+  if (key === "other") return 2;
+  return 1;
 }
 
 function optionValue(

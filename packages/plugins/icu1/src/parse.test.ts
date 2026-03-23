@@ -98,19 +98,41 @@ describe("parseMessage", () => {
             },
           },
         },
+        {
+          type: "local-variable",
+          name: "countPluralOffset1Exact",
+          value: {
+            type: "expression",
+            arg: { type: "variable-reference", name: "count" },
+          },
+        },
       ] satisfies Declaration[]),
     );
 
     expect(parsed.selectors).toEqual([
+      { type: "variable-reference", name: "countPluralOffset1Exact" },
       { type: "variable-reference", name: "countPluralOffset1" },
     ]);
 
     const matches = parsed.variants.map((variant) => variant.matches ?? []);
     expect(matches).toEqual(
       expect.arrayContaining([
-        [{ type: "literal-match", key: "countPluralOffset1", value: "=0" }],
-        [{ type: "literal-match", key: "countPluralOffset1", value: "one" }],
-        [{ type: "catchall-match", key: "countPluralOffset1" }],
+        [
+          {
+            type: "literal-match",
+            key: "countPluralOffset1Exact",
+            value: "0",
+          },
+          { type: "catchall-match", key: "countPluralOffset1" },
+        ],
+        [
+          { type: "catchall-match", key: "countPluralOffset1Exact" },
+          { type: "literal-match", key: "countPluralOffset1", value: "one" },
+        ],
+        [
+          { type: "catchall-match", key: "countPluralOffset1Exact" },
+          { type: "catchall-match", key: "countPluralOffset1" },
+        ],
       ]),
     );
 
@@ -162,6 +184,72 @@ describe("parseMessage", () => {
         },
       ] satisfies Declaration[]),
     );
+  });
+
+  it("orders exact plural cases before category and other cases", () => {
+    const parsed = parseMessage({
+      ...baseArgs,
+      messageSource:
+        "{item, plural, one {one item} other {other items} =0 {no items}}",
+    });
+
+    expect(parsed.selectors).toEqual([
+      { type: "variable-reference", name: "itemPluralExact" },
+      { type: "variable-reference", name: "itemPlural" },
+    ]);
+
+    expect(parsed.variants.map((variant) => variant.matches ?? [])).toEqual([
+      [
+        { type: "literal-match", key: "itemPluralExact", value: "0" },
+        { type: "catchall-match", key: "itemPlural" },
+      ],
+      [
+        { type: "catchall-match", key: "itemPluralExact" },
+        { type: "literal-match", key: "itemPlural", value: "one" },
+      ],
+      [
+        { type: "catchall-match", key: "itemPluralExact" },
+        { type: "catchall-match", key: "itemPlural" },
+      ],
+    ]);
+  });
+
+  it("shares exact plural selectors across nested branches", () => {
+    const parsed = parseMessage({
+      ...baseArgs,
+      messageSource:
+        "{gender, select, male {{n, plural, one {one} other {many}}} female {{n, plural, =0 {zero} other {many}}} other {fallback}}",
+    });
+
+    expect(parsed.selectors).toEqual([
+      { type: "variable-reference", name: "gender" },
+      { type: "variable-reference", name: "nPluralExact" },
+      { type: "variable-reference", name: "nPlural" },
+    ]);
+
+    expect(parsed.variants.map((variant) => variant.matches ?? [])).toEqual([
+      [
+        { type: "literal-match", key: "gender", value: "male" },
+        { type: "catchall-match", key: "nPluralExact" },
+        { type: "literal-match", key: "nPlural", value: "one" },
+      ],
+      [
+        { type: "literal-match", key: "gender", value: "male" },
+        { type: "catchall-match", key: "nPluralExact" },
+        { type: "catchall-match", key: "nPlural" },
+      ],
+      [
+        { type: "literal-match", key: "gender", value: "female" },
+        { type: "literal-match", key: "nPluralExact", value: "0" },
+        { type: "catchall-match", key: "nPlural" },
+      ],
+      [
+        { type: "literal-match", key: "gender", value: "female" },
+        { type: "catchall-match", key: "nPluralExact" },
+        { type: "catchall-match", key: "nPlural" },
+      ],
+      [{ type: "catchall-match", key: "gender" }],
+    ]);
   });
 
   it("avoids local variable name collisions with input variables", () => {
