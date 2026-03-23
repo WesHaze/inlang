@@ -226,11 +226,17 @@ function resolvePluralSelectorPair(
   const pluralConfig = resolveSelectorConfig(pluralSelector, declarations);
 
   if (
+    pluralConfig.type !== "plural" &&
+    pluralConfig.type !== "selectordinal"
+  ) {
+    return undefined;
+  }
+
+  if (
     !exactDeclaration ||
     exactDeclaration.type !== "local-variable" ||
     exactDeclaration.value.annotation !== undefined ||
     exactDeclaration.value.arg.type !== "variable-reference" ||
-    pluralConfig.type === "select" ||
     exactDeclaration.value.arg.name !== pluralConfig.arg
   ) {
     return undefined;
@@ -239,7 +245,11 @@ function resolvePluralSelectorPair(
   return {
     exactSelector,
     pluralSelector,
-    config: pluralConfig,
+    config: pluralConfig as {
+      type: "plural" | "selectordinal";
+      arg: string;
+      offset?: number;
+    },
   };
 }
 
