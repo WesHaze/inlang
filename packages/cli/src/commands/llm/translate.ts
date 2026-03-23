@@ -115,10 +115,6 @@ export async function llmTranslateCommandAction(
   } = args;
 
   const targetLocales = args.targetLocales.map((s) => s.trim()).filter(Boolean);
-  const apiKey = args.apiKey ?? process.env.INLANG_OPENROUTER_API_KEY;
-  if (!dryRun && !apiKey) {
-    throw new Error("INLANG_OPENROUTER_API_KEY is required unless --dry-run is used.");
-  }
 
   const bundles = await selectBundleNested(project.db).execute();
 
@@ -155,6 +151,11 @@ export async function llmTranslateCommandAction(
       `Dry run: would translate ${bundles.length} bundle(s) in batches of ${batchSize} from "${sourceLocale}" to [${targetLocales.join(", ")}] using model "${model}".`,
     );
     return { successCount: 0, errorCount: 0 };
+  }
+
+  const apiKey = args.apiKey ?? process.env.INLANG_OPENROUTER_API_KEY;
+  if (!apiKey) {
+    throw new Error("INLANG_OPENROUTER_API_KEY is required unless --dry-run is used.");
   }
 
   const chunks: typeof bundles[] = [];

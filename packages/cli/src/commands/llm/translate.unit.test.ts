@@ -109,6 +109,7 @@ describe("llmTranslateCommandAction — force flag", () => {
       sourceLocale: "en-gb",
       targetLocales: ["nl"],
       model: DEFAULT_MODEL,
+      apiKey: "test-key",
       force: true,
     });
 
@@ -126,6 +127,7 @@ describe("llmTranslateCommandAction — force flag", () => {
       sourceLocale: "en-gb",
       targetLocales: ["nl"],
       model: DEFAULT_MODEL,
+      apiKey: "test-key",
     });
 
     expect(vi.mocked(llmTranslateBundles).mock.calls[0]![0].force).toBeFalsy();
@@ -148,6 +150,7 @@ describe("llmTranslateCommandAction — context forwarded", () => {
       sourceLocale: "en-gb",
       targetLocales: ["nl"],
       model: DEFAULT_MODEL,
+      apiKey: "test-key",
       context: "Formal B2B tone",
     });
 
@@ -165,6 +168,7 @@ describe("llmTranslateCommandAction — context forwarded", () => {
       sourceLocale: "en-gb",
       targetLocales: ["nl"],
       model: DEFAULT_MODEL,
+      apiKey: "test-key",
     });
 
     expect(vi.mocked(llmTranslateBundles).mock.calls[0]![0].context).toBeUndefined();
@@ -187,6 +191,7 @@ describe("llmTranslateCommandAction — model forwarded", () => {
       sourceLocale: "en-gb",
       targetLocales: ["nl"],
       model: "anthropic/claude-3.5-haiku",
+      apiKey: "test-key",
     });
 
     expect(vi.mocked(llmTranslateBundles).mock.calls[0]![0].model).toBe("anthropic/claude-3.5-haiku");
@@ -209,6 +214,7 @@ describe("llmTranslateCommandAction — source locale in target list", () => {
       sourceLocale: "en-gb",
       targetLocales: ["en-gb", "nl"], // source appears in targets
       model: DEFAULT_MODEL,
+      apiKey: "test-key",
     });
 
     // The action still calls translate — the skip happens inside llmTranslateBundles
@@ -225,6 +231,7 @@ describe("llmTranslateCommandAction — source locale in target list", () => {
 describe("llmTranslateCommandAction — missing API key", () => {
   it("throws when INLANG_OPENROUTER_API_KEY is not set and dryRun=false", async () => {
     const project = await makeProject();
+    await insertBundle(project.db, "greet");
     const savedKey = process.env.INLANG_OPENROUTER_API_KEY;
     try {
       delete process.env.INLANG_OPENROUTER_API_KEY;
@@ -347,6 +354,7 @@ describe("llmTranslateCommandAction — batch-size chunking", () => {
       sourceLocale: "en-gb",
       targetLocales: ["nl"],
       model: DEFAULT_MODEL,
+      apiKey: "test-key",
       batchSize: 2, // 3 bundles → 2 chunks
     });
 
@@ -372,6 +380,7 @@ describe("llmTranslateCommandAction — targetLocales normalization", () => {
       sourceLocale: "en-gb",
       targetLocales: [" nl", "", " ", "nl"],
       model: DEFAULT_MODEL,
+      apiKey: "test-key",
     });
 
     const dispatched = vi.mocked(llmTranslateBundles).mock.calls[0]![0].targetLocales;
@@ -389,6 +398,7 @@ describe("llmTranslateCommandAction — targetLocales normalization", () => {
       sourceLocale: "en-gb",
       targetLocales: ["nl", ""],
       model: DEFAULT_MODEL,
+      apiKey: "test-key",
     });
 
     const dispatched = vi.mocked(llmTranslateBundles).mock.calls[0]![0].targetLocales;
