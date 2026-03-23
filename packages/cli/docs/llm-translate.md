@@ -46,7 +46,7 @@ This translates all bundles that are missing a translation for any locale define
 | Flag | Default | Description |
 | --- | --- | --- |
 | `--project <path>` | — | **Required.** Path to the `.inlang` project directory |
-| `--model <id>` | `openai/gpt-4o-mini` | Any [OpenRouter model ID](https://openrouter.ai/models) |
+| `--model <id>` | `openai/gpt-5-mini` | Any [OpenRouter model ID](https://openrouter.ai/models) |
 | `--locale <locale>` | `settings.baseLocale` | Override source locale from project settings |
 | `--targetLocales <locales...>` | all non-source locales | Target locales. Space-separated or comma-separated, e.g. `--targetLocales fr de` or `--targetLocales fr,de` |
 | `--context <text>` | — | Inline brand/style instructions for the LLM |
@@ -83,7 +83,7 @@ This translates all bundles that are missing a translation for any locale define
 Example:
 
 ```bash
-npx @inlang/cli llm translate --project ./project.inlang --model openai/gpt-4o-mini
+npx @inlang/cli llm translate --project ./project.inlang --model openai/gpt-5-mini
 ```
 
 ---
