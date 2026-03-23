@@ -52,9 +52,12 @@ export function extractJson(raw: string): unknown {
   // Step 4: Remove trailing commas
   s = s.replace(/,(\s*[}\]])/g, "$1");
 
-  // Step 5: Replace single quotes with double quotes (best-effort)
-  s = s.replace(/'/g, '"');
-
-  // Step 6: Parse
-  return JSON.parse(s);
+  // Step 5+6: Try to parse as-is first; only apply single-quote substitution
+  // if the first attempt fails (avoids corrupting apostrophes in valid JSON values).
+  try {
+    return JSON.parse(s);
+  } catch {
+    // best-effort: replace bare single-quote delimiters with double quotes
+    return JSON.parse(s.replace(/'/g, '"'));
+  }
 }

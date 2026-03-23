@@ -50,4 +50,14 @@ describe("extractJson", () => {
   it("handles JSON values containing bracket characters in strings", () => {
     expect(extractJson('{"key": "press {enter}"}')).toEqual({ key: "press {enter}" });
   });
+
+  it("does not corrupt apostrophes in double-quoted string values", () => {
+    expect(extractJson('{"fr":"it\'s a test"}')).toEqual({ fr: "it's a test" });
+  });
+
+  it("does not corrupt apostrophes in nested array values", () => {
+    expect(extractJson('{"fr":["it\'s fine","don\'t stop"]}')).toEqual({
+      fr: ["it's fine", "don't stop"],
+    });
+  });
 });
