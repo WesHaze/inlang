@@ -272,7 +272,8 @@ describe("llmTranslateCommandAction — missing API key", () => {
         }),
       ).rejects.toThrow(/INLANG_OPENROUTER_API_KEY/);
     } finally {
-      process.env.INLANG_OPENROUTER_API_KEY = savedKey;
+      if (savedKey === undefined) delete process.env.INLANG_OPENROUTER_API_KEY;
+      else process.env.INLANG_OPENROUTER_API_KEY = savedKey;
     }
   });
 
@@ -291,7 +292,8 @@ describe("llmTranslateCommandAction — missing API key", () => {
         }),
       ).resolves.not.toThrow();
     } finally {
-      process.env.INLANG_OPENROUTER_API_KEY = savedKey;
+      if (savedKey === undefined) delete process.env.INLANG_OPENROUTER_API_KEY;
+      else process.env.INLANG_OPENROUTER_API_KEY = savedKey;
     }
   });
 
@@ -313,7 +315,8 @@ describe("llmTranslateCommandAction — missing API key", () => {
         }),
       ).resolves.not.toThrow();
     } finally {
-      process.env.INLANG_OPENROUTER_API_KEY = savedKey;
+      if (savedKey === undefined) delete process.env.INLANG_OPENROUTER_API_KEY;
+      else process.env.INLANG_OPENROUTER_API_KEY = savedKey;
     }
   });
 });
@@ -355,7 +358,8 @@ describe("llmTranslateCommandAction — api-key forwarded", () => {
         apiKey: "arg-key",
       });
     } finally {
-      process.env.INLANG_OPENROUTER_API_KEY = savedKey;
+      if (savedKey === undefined) delete process.env.INLANG_OPENROUTER_API_KEY;
+      else process.env.INLANG_OPENROUTER_API_KEY = savedKey;
     }
 
     expect((vi.mocked(llmTranslateBundles).mock.calls[0]![0].client as OpenRouterClient).apiKey).toBe("arg-key");
