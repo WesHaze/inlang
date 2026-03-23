@@ -63,6 +63,8 @@ async function insertBundle(db: any, id: string, value = "Hello") {
   });
 }
 
+// translated is intentionally omitted (undefined/falsy) — callers that need a
+// translated result must spread `{ ...makeMockResult(id), translated: true }`.
 function makeMockResult(bundleId: string) {
   return {
     data: {
