@@ -361,6 +361,72 @@ runIf("llmTranslateBundle (integration)", () => {
     }
   }, 30_000);
 
+  it("LTR non-Latin: Japanese translation produces CJK script and preserves variables", async () => {
+    const project = await loadProjectInMemory({
+      blob: await newProject({
+        settings: { baseLocale: "en", locales: ["en", "ja"] },
+      }),
+    });
+
+    await insertBundleNested(project.db, {
+      id: "ltr_plain",
+      messages: [{
+        id: "ltr_plain_msg", bundleId: "ltr_plain", locale: "en",
+        variants: [{ id: "ltr_plain_var", messageId: "ltr_plain_msg", pattern: [{ type: "text" as const, value: "Your session has expired. Please log in again." }] }],
+      }],
+    });
+
+    await insertBundleNested(project.db, {
+      id: "ltr_with_var",
+      messages: [{
+        id: "ltr_with_var_msg", bundleId: "ltr_with_var", locale: "en",
+        variants: [{
+          id: "ltr_with_var_v", messageId: "ltr_with_var_msg",
+          pattern: [
+            { type: "text" as const, value: "Welcome, " },
+            { type: "expression" as const, arg: { type: "variable-reference" as const, name: "name" } },
+            { type: "text" as const, value: "! You have " },
+            { type: "expression" as const, arg: { type: "variable-reference" as const, name: "count" } },
+            { type: "text" as const, value: " unread messages." },
+          ],
+        }],
+      }],
+    });
+
+    const bundles = await selectBundleNested(project.db).execute();
+    // Hiragana, Katakana, or CJK Unified Ideographs
+    const japaneseScript = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/;
+
+    for (const bundle of bundles) {
+      const result = await llmTranslateBundle({
+        bundle,
+        sourceLocale: "en",
+        targetLocales: ["ja"],
+        client: integrationClient,
+        model: DEFAULT_MODEL,
+      });
+      expect(result.error, `${bundle.id}: unexpected error`).toBeUndefined();
+
+      const msg = result.data!.messages.find((m: NewMessageNested) => m.locale === "ja");
+      expect(msg, `${bundle.id}: missing ja message`).toBeDefined();
+      const tgtPattern = (msg!.variants[0] as NewVariant | undefined)?.pattern ?? [];
+
+      // At least one text node must contain Japanese script characters.
+      const hasJapanese = tgtPattern.some(
+        (n) => n.type === "text" && "value" in n && japaneseScript.test(String(n.value)),
+      );
+      expect(hasJapanese, `${bundle.id}: no Japanese script found in translated pattern`).toBe(true);
+
+      // Expression nodes must be preserved unchanged and in order.
+      const srcPattern = bundle.messages[0]!.variants[0]!.pattern ?? [];
+      srcPattern.forEach((srcNode, i) => {
+        if (srcNode.type === "expression") {
+          expect(tgtPattern[i], `${bundle.id}/ja[${i}]: expression node mutated`).toEqual(srcNode);
+        }
+      });
+    }
+  }, 30_000);
+
   it("EDGE: preserves expression nodes (variables) in translated pattern", async () => {
     const project = await loadProjectInMemory({
       blob: await newProject({
