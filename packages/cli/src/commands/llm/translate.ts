@@ -193,6 +193,7 @@ export async function llmTranslateCommandAction(
       const { results, usage } = await llmTranslateBundles({ bundles: chunk, sourceLocale, targetLocales, model, client, context, force, quiet });
       let chunkSuccess = 0;
       let chunkErrors = 0;
+      const chunkFailed: string[] = [];
       for (let i = 0; i < results.length; i++) {
         const result = results[i]!;
         const bundle = chunk[i]!;
@@ -211,12 +212,14 @@ export async function llmTranslateCommandAction(
               `  [${bundle.id}] failed to upsert: ${upsertErr instanceof Error ? upsertErr.message : String(upsertErr)}`,
             );
           }
+        } else if (result.attempted) {
+          chunkFailed.push(bundle.id);
         }
       }
       if (!quiet) {
         log.info(`  [batch ${chunkIdx + 1}/${chunks.length}] ${formatUsage(usage)}`);
       }
-      return { usage, successCount: chunkSuccess, errorCount: chunkErrors };
+      return { usage, successCount: chunkSuccess, errorCount: chunkErrors, failedIds: chunkFailed };
     }),
   );
 
@@ -229,10 +232,17 @@ export async function llmTranslateCommandAction(
   };
   const successCount = chunkResults.reduce((sum, r) => sum + r.successCount, 0);
   const errorCount = chunkResults.reduce((sum, r) => sum + r.errorCount, 0);
+  const failedIds = chunkResults.flatMap((r) => r.failedIds);
 
   log.success(
     `LLM translate complete. ${successCount} bundle(s) translated, ${errorCount} error(s). ${formatUsage(totalUsage)} used.`,
   );
+
+  if (failedIds.length > 0) {
+    log.warn(
+      `Could not translate ${failedIds.length} bundle(s) (LLM validation failed for all locales):\n${failedIds.map((id) => `  - ${id}`).join("\n")}`,
+    );
+  }
 
   return { successCount, errorCount };
 }

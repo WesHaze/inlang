@@ -36,6 +36,8 @@ export type LlmTranslateBundleResult = {
   data?: NewBundleNested;
   /** true only when at least one variant was actually written */
   translated?: boolean;
+  /** true when translation was attempted (there was work to do) but nothing got through */
+  attempted?: boolean;
   error?: string;
   usage?: OpenRouterUsage;
 };
@@ -224,6 +226,7 @@ export async function llmTranslateBundles(
   type WorkItem = { copyIdx: number; sourceVariant: NewVariant; targetLocales: string[] };
   const workMap = new Map<string, WorkItem>();
   const bundleErrors = new Map<number, string>(); // copyIdx → error message
+  const attemptedIndices = new Set<number>(); // copyIdx values that had work queued
 
   for (let i = 0; i < copies.length; i++) {
     const copy = copies[i]!;
@@ -249,6 +252,7 @@ export async function llmTranslateBundles(
       if (targetLocales.length > 0) {
         const variantId = sourceVariant.id ?? randomUUID();
         workMap.set(`${copy.id}::${variantId}`, { copyIdx: i, sourceVariant, targetLocales });
+        attemptedIndices.add(i);
       }
     }
   }
@@ -374,7 +378,7 @@ export async function llmTranslateBundles(
     results: copies.map((data, i) =>
       bundleErrors.has(i)
         ? { error: bundleErrors.get(i) }
-        : { data, translated: translatedIndices.has(i) },
+        : { data, translated: translatedIndices.has(i), attempted: attemptedIndices.has(i) },
     ),
     usage: accumulatedUsage,
   };
