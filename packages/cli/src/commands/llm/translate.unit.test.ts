@@ -411,7 +411,7 @@ describe("llmTranslateCommandAction — targetLocales normalization", () => {
     });
 
     const dispatched = vi.mocked(llmTranslateBundles).mock.calls[0]![0].targetLocales;
-    expect(dispatched).toEqual(["nl", "nl"]);
+    expect(dispatched).toEqual(["nl"]);
   });
 
   it("drops a trailing empty string produced by a trailing comma", async () => {

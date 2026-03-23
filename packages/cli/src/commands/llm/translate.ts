@@ -129,7 +129,7 @@ export async function llmTranslateCommandAction(
     quiet = false,
   } = args;
 
-  const targetLocales = args.targetLocales.map((s) => s.trim()).filter(Boolean);
+  const targetLocales = [...new Set(args.targetLocales.map((s) => s.trim()).filter(Boolean))];
 
   const bundles = await selectBundleNested(project.db).execute();
 
