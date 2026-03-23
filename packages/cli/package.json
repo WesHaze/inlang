@@ -45,6 +45,7 @@
   },
   "dependencies": {
     "@inlang/sdk": "workspace:*",
+    "@openrouter/sdk": "^0.9.11",
     "esbuild-wasm": "^0.19.2"
   },
   "devDependencies": {

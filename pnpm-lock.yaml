@@ -29,6 +29,9 @@ importers:
       '@inlang/sdk':
         specifier: workspace:*
         version: link:../sdk
+      '@openrouter/sdk':
+        specifier: ^0.9.11
+        version: 0.9.11
       esbuild-wasm:
         specifier: ^0.19.2
         version: 0.19.12
@@ -3658,6 +3661,9 @@ packages:
 
   '@open-draft/until@2.1.0':
     resolution: {integrity: sha512-U69T3ItWHvLwGg5eJ0n3I62nWuE6ilHlmz7zM0npLBRvPRd7e6NYmg54vvRtP5mZG7kZqZCFVdsTWo7BPtBujg==}
+
+  '@openrouter/sdk@0.9.11':
+    resolution: {integrity: sha512-BgFu6NcIJO4a9aVjr04y3kZ8pyM71j15I+bzfVAGEvxnj+KQNIkBYQGgwrG3D+aT1QpDKLki8btcQmpaxUas6A==}
 
   '@opral/markdown-wc@0.8.1':
     resolution: {integrity: sha512-dobCY2VDdixBsIz1XPaZQUeNCpKZkkCB5WJeytKTtt7H1miWDy8/dSqStpc9jl5d/kj+T5s1+IaoojTymt0tCw==}
@@ -14730,6 +14736,10 @@ snapshots:
 
   '@open-draft/until@2.1.0':
     optional: true
+
+  '@openrouter/sdk@0.9.11':
+    dependencies:
+      zod: 3.25.76
 
   '@opral/markdown-wc@0.8.1':
     dependencies:
