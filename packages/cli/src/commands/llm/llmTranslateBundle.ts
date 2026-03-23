@@ -144,14 +144,8 @@ export async function llmTranslateBundle(
           siteName: process.env.OPENROUTER_SITE_NAME,
         });
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        if (attempt < MAX_RETRIES - 1) {
-          console.warn(
-            `[llm-translate] Bundle "${args.bundle.id}": API error (attempt ${attempt + 1}/${MAX_RETRIES}): ${msg}, retrying...`,
-          );
-          continue;
-        }
-        return { error: msg };
+        // callOpenRouter already retried internally — propagate immediately.
+        return { error: err instanceof Error ? err.message : String(err) };
       }
 
       totalUsage.promptTokens += response.usage.promptTokens;
@@ -340,11 +334,8 @@ export async function llmTranslateBundles(
         siteName: process.env.OPENROUTER_SITE_NAME,
       });
     } catch (err) {
+      // callOpenRouter already retried internally — propagate immediately.
       const error = err instanceof Error ? err.message : String(err);
-      if (attempt < MAX_RETRIES - 1) {
-        console.warn(`[llm-translate] batch API error (attempt ${attempt + 1}/${MAX_RETRIES}): ${error}, retrying...`);
-        continue;
-      }
       return { results: args.bundles.map(() => ({ error })), usage: accumulatedUsage };
     }
 
