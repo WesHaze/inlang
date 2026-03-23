@@ -190,7 +190,7 @@ export async function llmTranslateBundle(
 
       const nextRemainingLocales: string[] = [];
       for (const targetLocale of remainingLocales) {
-        const rawPattern = translationsMap[targetLocale];
+        const rawPattern = coerceRawPattern(translationsMap[targetLocale]);
         const validation = validateTranslatedPattern(
           sourceVariant.pattern ?? [],
           rawPattern,
@@ -270,12 +270,16 @@ export async function llmTranslateBundles(
     };
   }
 
+  // Collect all distinct target locales across all keys so we can show a concrete example.
+  const allTargetLocales = [...new Set(Object.values(keyEntries).flatMap((e) => e.targetLocales))];
+  const exampleLocaleEntries = allTargetLocales.map((l) => `"${l}":[...pattern...]`).join(",");
+
   const contextLine = args.context ? `\nContext: ${args.context}` : "";
   const userContent = [
     `Translate the following keys from "${args.sourceLocale}" to each key's specified target locales.`,
     contextLine,
-    `Respond ONLY with minified JSON (no whitespace): {"key":{"locale":[...pattern...]}}`,
-    `IMPORTANT: each locale value must be a bare JSON array (not wrapped in an object).`,
+    `Respond ONLY with minified JSON (no whitespace): {"<key>":{${exampleLocaleEntries}}}`,
+    `Replace <key> with the actual key string. Each locale value must be a bare JSON array (not wrapped in an object).`,
     `Keys:`,
     JSON.stringify(keyEntries),
   ]
@@ -347,10 +351,14 @@ export async function llmTranslateBundles(
     for (const targetLocale of targetLocales) {
       // When there is only one target locale the LLM sometimes returns the pattern
       // array directly ({ key: [...] }) instead of the nested form ({ key: { locale: [...] } }).
-      const rawPattern =
+      // Also handle the case where the LLM used the literal word "locale" as a key.
+      const localeMapObj = localeMap as Record<string, unknown>;
+      const rawLookup =
         Array.isArray(localeMap) && targetLocales.length === 1
           ? localeMap
-          : (localeMap as Record<string, unknown>)[targetLocale];
+          : localeMapObj[targetLocale] ??
+            (targetLocales.length === 1 && "locale" in localeMapObj ? localeMapObj["locale"] : undefined);
+      const rawPattern = coerceRawPattern(rawLookup);
       const validation = validateTranslatedPattern(sourceVariant.pattern ?? [], rawPattern);
       if (!validation.valid) {
         if (!args.quiet) log.warn(`${LOG_PREFIX} Bundle "${copy.id}" → ${targetLocale}: ${validation.error}, skipping`);
@@ -370,6 +378,20 @@ export async function llmTranslateBundles(
     ),
     usage: accumulatedUsage,
   };
+}
+
+/**
+ * LLMs sometimes return a bare string or an array of strings instead of a
+ * proper pattern array.  Coerce either form so validation can proceed.
+ */
+function coerceRawPattern(raw: unknown): unknown {
+  if (typeof raw === "string") {
+    return [{ type: "text", value: raw }];
+  }
+  if (Array.isArray(raw) && raw.every((n) => typeof n === "string")) {
+    return raw.map((n) => ({ type: "text", value: n }));
+  }
+  return raw;
 }
 
 function sleep(ms: number): Promise<void> {
