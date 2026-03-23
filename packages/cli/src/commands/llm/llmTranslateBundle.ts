@@ -380,7 +380,13 @@ export async function llmTranslateBundles(
     if (!localeMap) continue;
 
     for (const targetLocale of targetLocales) {
-      const validation = validateTranslatedPattern(sourceVariant.pattern ?? [], localeMap[targetLocale]);
+      // When there is only one target locale the LLM sometimes returns the pattern
+      // array directly ({ key: [...] }) instead of the nested form ({ key: { locale: [...] } }).
+      const rawPattern =
+        Array.isArray(localeMap) && targetLocales.length === 1
+          ? localeMap
+          : (localeMap as Record<string, unknown>)[targetLocale];
+      const validation = validateTranslatedPattern(sourceVariant.pattern ?? [], rawPattern);
       if (!validation.valid) {
         console.warn(`[llm-translate] Bundle "${copy.id}" → ${targetLocale}: ${validation.error}, skipping`);
         continue;
