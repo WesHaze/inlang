@@ -77,7 +77,7 @@ export const translate = new Command()
         }
       }
 
-      const { errorCount } = await llmTranslateCommandAction({
+      const { successCount, errorCount } = await llmTranslateCommandAction({
         project,
         sourceLocale,
         targetLocales,
@@ -91,7 +91,9 @@ export const translate = new Command()
       });
 
       if (!options.dryRun) {
-        await saveProjectToDirectory({ fs, path: args.project, project });
+        if (successCount > 0) {
+          await saveProjectToDirectory({ fs, path: args.project, project });
+        }
         if (errorCount > 0) exitCode = 1;
       }
     } catch (error) {
