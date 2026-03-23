@@ -7,20 +7,14 @@ import type {
   NewVariant,
   Pattern,
 } from "@inlang/sdk";
-import {
-  callOpenRouter,
-  type OpenRouterUsage,
-  OPENROUTER_API_KEY_ENV,
-  OPENROUTER_SITE_URL_ENV,
-  OPENROUTER_SITE_NAME_ENV,
-} from "./openrouterClient.js";
+import { type OpenRouterClient, type OpenRouterUsage } from "./openrouterClient.js";
 import { serializePattern, validateTranslatedPattern } from "./astSerializer.js";
 
 export type LlmTranslateBundleArgs = {
   bundle: BundleNested;
   sourceLocale: string;
   targetLocales: string[];
-  openrouterApiKey?: string;
+  client: OpenRouterClient;
   model: string;
   context?: string;
   force?: boolean;
@@ -62,11 +56,6 @@ const SYSTEM_PROMPT =
 export async function llmTranslateBundle(
   args: LlmTranslateBundleArgs,
 ): Promise<LlmTranslateBundleResult> {
-  const apiKey = args.openrouterApiKey ?? process.env[OPENROUTER_API_KEY_ENV];
-  if (!apiKey) {
-    return { error: `${OPENROUTER_API_KEY_ENV} is not set` };
-  }
-
   const copy = structuredClone(args.bundle) as NewBundleNested;
 
   const sourceMessage = copy.messages.find(
@@ -148,18 +137,15 @@ export async function llmTranslateBundle(
 
       let response;
       try {
-        response = await callOpenRouter({
+        response = await args.client.complete({
           model: args.model,
           messages: [
             { role: "system", content: SYSTEM_PROMPT },
             { role: "user", content: userContent },
           ],
-          apiKey,
-          siteUrl: process.env[OPENROUTER_SITE_URL_ENV],
-          siteName: process.env[OPENROUTER_SITE_NAME_ENV],
         });
       } catch (err) {
-        // callOpenRouter already retried internally — propagate immediately.
+        // client.complete already retried internally — propagate immediately.
         return { error: err instanceof Error ? err.message : String(err) };
       }
 
@@ -216,15 +202,6 @@ export async function llmTranslateBundle(
 export async function llmTranslateBundles(
   args: LlmTranslateBundlesArgs,
 ): Promise<LlmTranslateBundlesResult> {
-  const apiKey = args.openrouterApiKey ?? process.env[OPENROUTER_API_KEY_ENV];
-
-  if (!apiKey) {
-    return {
-      results: args.bundles.map(() => ({ error: `${OPENROUTER_API_KEY_ENV} is not set` })),
-      usage: emptyUsage(),
-    };
-  }
-
   const copies = args.bundles.map((b) => structuredClone(b) as NewBundleNested);
 
   // Build work map: `${bundleId}::${variantId}` → work item
@@ -297,18 +274,15 @@ export async function llmTranslateBundles(
 
     let response;
     try {
-      response = await callOpenRouter({
+      response = await args.client.complete({
         model: args.model,
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: userContent },
         ],
-        apiKey,
-        siteUrl: process.env[OPENROUTER_SITE_URL_ENV],
-        siteName: process.env[OPENROUTER_SITE_NAME_ENV],
       });
     } catch (err) {
-      // callOpenRouter already retried internally — propagate immediately.
+      // client.complete already retried internally — propagate immediately.
       const error = err instanceof Error ? err.message : String(err);
       return { results: args.bundles.map(() => ({ error })), usage: accumulatedUsage };
     }

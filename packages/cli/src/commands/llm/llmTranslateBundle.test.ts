@@ -9,6 +9,7 @@ import {
   type Pattern,
 } from "@inlang/sdk";
 import { llmTranslateBundle } from "./llmTranslateBundle.js";
+import { OpenRouterClient } from "./openrouterClient.js";
 import { generateFixtureKeys } from "./fixtures.js";
 import { DEFAULT_MODEL } from "./translate.js";
 
@@ -19,6 +20,8 @@ const runIf = process.env.OPENROUTER_API_KEY
   : describe.skip;
 
 runIf("llmTranslateBundle (integration)", () => {
+  const integrationClient = new OpenRouterClient({ apiKey: process.env.OPENROUTER_API_KEY! });
+
   it("translates a simple text bundle from en-gb to nl", async () => {
     const project = await loadProjectInMemory({
       blob: await newProject({
@@ -49,6 +52,7 @@ runIf("llmTranslateBundle (integration)", () => {
       bundle: bundle!,
       sourceLocale: "en-gb",
       targetLocales: ["nl"],
+      client: integrationClient,
       model: DEFAULT_MODEL,
     });
 
@@ -97,6 +101,7 @@ runIf("llmTranslateBundle (integration)", () => {
           bundle,
           sourceLocale: "en-gb",
           targetLocales: ["nl", "de"],
+          client: integrationClient,
           model: DEFAULT_MODEL,
         });
 
@@ -155,6 +160,7 @@ runIf("llmTranslateBundle (integration)", () => {
       bundle: bundle!,
       sourceLocale: "en-gb",
       targetLocales: ["nl", "fr", "de"],
+      client: integrationClient,
       model: DEFAULT_MODEL,
     });
 
@@ -219,7 +225,7 @@ it("skips already-translated variants without calling OpenRouter", async () => {
     bundle: bundle!,
     sourceLocale: "en-gb",
     targetLocales: ["nl"],
-    openrouterApiKey: "invalid-key-should-not-be-used",
+    client: new OpenRouterClient({ apiKey: "invalid-key-should-not-be-used" }),
     model: DEFAULT_MODEL,
   });
 
@@ -236,46 +242,5 @@ it("skips already-translated variants without calling OpenRouter", async () => {
   ).toBe("Opslaan");
 });
 
-it("returns error when no API key is provided", async () => {
-  const project = await loadProjectInMemory({
-    blob: await newProject({
-      settings: { baseLocale: "en-gb", locales: ["en-gb", "nl"] },
-    }),
-  });
-
-  await insertBundleNested(project.db, {
-    id: "test",
-    messages: [
-      {
-        id: "test_en",
-        bundleId: "test",
-        locale: "en-gb",
-        variants: [
-          {
-            id: "test_en_v",
-            messageId: "test_en",
-            pattern: [{ type: "text", value: "Test" }],
-          },
-        ],
-      },
-    ],
-  });
-
-  const [bundle] = await selectBundleNested(project.db).execute();
-  const savedKey = process.env.OPENROUTER_API_KEY;
-  try {
-    delete process.env.OPENROUTER_API_KEY;
-    const result = await llmTranslateBundle({
-      bundle: bundle!,
-      sourceLocale: "en-gb",
-      targetLocales: ["nl"],
-      openrouterApiKey: undefined,
-      model: DEFAULT_MODEL,
-    });
-    expect(result.error).toMatch(/OPENROUTER_API_KEY/);
-  } finally {
-    process.env.OPENROUTER_API_KEY = savedKey;
-  }
-});
 
 }); // llmTranslateBundle (unit)

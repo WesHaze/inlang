@@ -1,6 +1,6 @@
 /**
  * Unit tests for llmTranslateBundle and llmTranslateBundles.
- * callOpenRouter is mocked — no real API calls are made.
+ * OpenRouterClient is mocked — no real API calls are made.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
@@ -12,12 +12,14 @@ import {
   type NewVariant,
 } from "@inlang/sdk";
 import { llmTranslateBundle, llmTranslateBundles } from "./llmTranslateBundle.js";
+import type { OpenRouterClient } from "./openrouterClient.js";
 
-vi.mock("./openrouterClient.js");
-import { callOpenRouter } from "./openrouterClient.js";
+const mockComplete = vi.fn();
+const mockClient = { complete: mockComplete } as unknown as OpenRouterClient;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockComplete.mockReset();
 });
 
 // ---------------------------------------------------------------------------
@@ -37,7 +39,6 @@ function mockOk(content: string) {
 }
 
 const MODEL = "openai/gpt-4o-mini";
-const API_KEY = "test-key";
 
 async function makeProject(locales: string[] = ["en-gb", "nl"]) {
   return loadProjectInMemory({
@@ -88,12 +89,12 @@ describe("llmTranslateBundle — source locale not found", () => {
       bundle: bundle!,
       sourceLocale: "fr", // not in bundle
       targetLocales: ["nl"],
-      openrouterApiKey: API_KEY,
+      client: mockClient,
       model: MODEL,
     });
 
     expect(result.error).toMatch(/Source locale "fr" not found/);
-    expect(callOpenRouter).not.toHaveBeenCalled();
+    expect(mockComplete).not.toHaveBeenCalled();
   });
 });
 
@@ -112,13 +113,13 @@ describe("llmTranslateBundle — source locale in target list", () => {
       bundle: bundle!,
       sourceLocale: "en-gb",
       targetLocales: ["en-gb"],
-      openrouterApiKey: API_KEY,
+      client: mockClient,
       model: MODEL,
     });
 
     expect(result.error).toBeUndefined();
     expect(result.data).toBeDefined();
-    expect(callOpenRouter).not.toHaveBeenCalled();
+    expect(mockComplete).not.toHaveBeenCalled();
   });
 
   it("translates only non-source locales when source is mixed into targets", async () => {
@@ -126,7 +127,7 @@ describe("llmTranslateBundle — source locale in target list", () => {
     await insertSimpleBundle(project.db, "greet", "Hello");
     const [bundle] = await selectBundleNested(project.db).execute();
 
-    vi.mocked(callOpenRouter).mockResolvedValueOnce(
+    mockComplete.mockResolvedValueOnce(
       mockOk(JSON.stringify({ nl: [{ type: "text", value: "Hallo" }] })),
     );
 
@@ -134,7 +135,7 @@ describe("llmTranslateBundle — source locale in target list", () => {
       bundle: bundle!,
       sourceLocale: "en-gb",
       targetLocales: ["en-gb", "nl"], // en-gb should be filtered out
-      openrouterApiKey: API_KEY,
+      client: mockClient,
       model: MODEL,
     });
 
@@ -164,13 +165,13 @@ describe("llmTranslateBundle — zero source variants", () => {
       bundle: bundle!,
       sourceLocale: "en-gb",
       targetLocales: ["nl"],
-      openrouterApiKey: API_KEY,
+      client: mockClient,
       model: MODEL,
     });
 
     expect(result.error).toBeUndefined();
     expect(result.data).toBeDefined();
-    expect(callOpenRouter).not.toHaveBeenCalled();
+    expect(mockComplete).not.toHaveBeenCalled();
   });
 });
 
@@ -201,7 +202,7 @@ describe("llmTranslateBundle — partial pre-existing translations", () => {
     });
     const [bundle] = await selectBundleNested(project.db).execute();
 
-    vi.mocked(callOpenRouter).mockResolvedValueOnce(
+    mockComplete.mockResolvedValueOnce(
       mockOk(JSON.stringify({ de: [{ type: "text", value: "Speichern" }] })),
     );
 
@@ -209,7 +210,7 @@ describe("llmTranslateBundle — partial pre-existing translations", () => {
       bundle: bundle!,
       sourceLocale: "en-gb",
       targetLocales: ["nl", "de"],
-      openrouterApiKey: API_KEY,
+      client: mockClient,
       model: MODEL,
     });
 
@@ -224,7 +225,7 @@ describe("llmTranslateBundle — partial pre-existing translations", () => {
     expect((de!.variants[0] as NewVariant).pattern![0]).toMatchObject({ type: "text", value: "Speichern" });
 
     // API was called with only "de", not "nl"
-    const callArgs = vi.mocked(callOpenRouter).mock.calls[0]!;
+    const callArgs = mockComplete.mock.calls[0]!;
     expect(callArgs[0].messages[1]!.content).toContain('"de"');
     expect(callArgs[0].messages[1]!.content).not.toContain('"nl":[...pattern...]');
   });
@@ -240,7 +241,7 @@ describe("llmTranslateBundle — force flag", () => {
     await insertSimpleBundle(project.db, "save", "Save", "Opslaan");
     const [bundle] = await selectBundleNested(project.db).execute();
 
-    vi.mocked(callOpenRouter).mockResolvedValueOnce(
+    mockComplete.mockResolvedValueOnce(
       mockOk(JSON.stringify({ nl: [{ type: "text", value: "Bewaren" }] })),
     );
 
@@ -248,12 +249,12 @@ describe("llmTranslateBundle — force flag", () => {
       bundle: bundle!,
       sourceLocale: "en-gb",
       targetLocales: ["nl"],
-      openrouterApiKey: API_KEY,
+      client: mockClient,
       model: MODEL,
       force: true,
     });
 
-    expect(callOpenRouter).toHaveBeenCalledTimes(1);
+    expect(mockComplete).toHaveBeenCalledTimes(1);
     const nl = result.data!.messages.find((m: NewMessageNested) => m.locale === "nl");
     expect((nl!.variants[0] as NewVariant).pattern![0]).toMatchObject({ type: "text", value: "Bewaren" });
   });
@@ -267,12 +268,12 @@ describe("llmTranslateBundle — force flag", () => {
       bundle: bundle!,
       sourceLocale: "en-gb",
       targetLocales: ["nl"],
-      openrouterApiKey: API_KEY,
+      client: mockClient,
       model: MODEL,
       force: false,
     });
 
-    expect(callOpenRouter).not.toHaveBeenCalled();
+    expect(mockComplete).not.toHaveBeenCalled();
     const nl = result.data!.messages.find((m: NewMessageNested) => m.locale === "nl");
     expect((nl!.variants[0] as NewVariant).pattern![0]).toMatchObject({ type: "text", value: "Opslaan" });
   });
@@ -288,7 +289,7 @@ describe("llmTranslateBundle — context forwarded", () => {
     await insertSimpleBundle(project.db, "greet", "Hello");
     const [bundle] = await selectBundleNested(project.db).execute();
 
-    vi.mocked(callOpenRouter).mockResolvedValueOnce(
+    mockComplete.mockResolvedValueOnce(
       mockOk(JSON.stringify({ nl: [{ type: "text", value: "Hallo" }] })),
     );
 
@@ -296,27 +297,27 @@ describe("llmTranslateBundle — context forwarded", () => {
       bundle: bundle!,
       sourceLocale: "en-gb",
       targetLocales: ["nl"],
-      openrouterApiKey: API_KEY,
+      client: mockClient,
       model: MODEL,
       context: "Formal tone, B2B SaaS product",
     });
 
-    const userMessage = vi.mocked(callOpenRouter).mock.calls[0]![0].messages[1]!.content;
+    const userMessage = mockComplete.mock.calls[0]![0].messages[1]!.content;
     expect(userMessage).toContain("Formal tone, B2B SaaS product");
   });
 });
 
 // ---------------------------------------------------------------------------
-// llmTranslateBundle — model forwarded to callOpenRouter
+// llmTranslateBundle — model forwarded to client.complete
 // ---------------------------------------------------------------------------
 
 describe("llmTranslateBundle — model propagation", () => {
-  it("passes the model argument through to callOpenRouter", async () => {
+  it("passes the model argument through to client.complete", async () => {
     const project = await makeProject(["en-gb", "nl"]);
     await insertSimpleBundle(project.db, "greet", "Hello");
     const [bundle] = await selectBundleNested(project.db).execute();
 
-    vi.mocked(callOpenRouter).mockResolvedValueOnce(
+    mockComplete.mockResolvedValueOnce(
       mockOk(JSON.stringify({ nl: [{ type: "text", value: "Hallo" }] })),
     );
 
@@ -324,11 +325,11 @@ describe("llmTranslateBundle — model propagation", () => {
       bundle: bundle!,
       sourceLocale: "en-gb",
       targetLocales: ["nl"],
-      openrouterApiKey: API_KEY,
+      client: mockClient,
       model: "anthropic/claude-3.5-haiku",
     });
 
-    expect(vi.mocked(callOpenRouter).mock.calls[0]![0].model).toBe("anthropic/claude-3.5-haiku");
+    expect(mockComplete.mock.calls[0]![0].model).toBe("anthropic/claude-3.5-haiku");
   });
 });
 
@@ -342,7 +343,7 @@ describe("llmTranslateBundle — retry on invalid JSON", () => {
     await insertSimpleBundle(project.db, "greet", "Hello");
     const [bundle] = await selectBundleNested(project.db).execute();
 
-    vi.mocked(callOpenRouter)
+    mockComplete
       .mockResolvedValueOnce(mockOk("not valid json"))
       .mockResolvedValueOnce(mockOk(JSON.stringify({ nl: [{ type: "text", value: "Hallo" }] })));
 
@@ -350,11 +351,11 @@ describe("llmTranslateBundle — retry on invalid JSON", () => {
       bundle: bundle!,
       sourceLocale: "en-gb",
       targetLocales: ["nl"],
-      openrouterApiKey: API_KEY,
+      client: mockClient,
       model: MODEL,
     });
 
-    expect(callOpenRouter).toHaveBeenCalledTimes(2);
+    expect(mockComplete).toHaveBeenCalledTimes(2);
     expect(result.error).toBeUndefined();
     const nl = result.data!.messages.find((m: NewMessageNested) => m.locale === "nl");
     expect(nl).toBeDefined();
@@ -367,7 +368,7 @@ describe("llmTranslateBundle — retry on non-object response", () => {
     await insertSimpleBundle(project.db, "greet", "Hello");
     const [bundle] = await selectBundleNested(project.db).execute();
 
-    vi.mocked(callOpenRouter)
+    mockComplete
       .mockResolvedValueOnce(mockOk("[1, 2, 3]")) // bare array — wrong structure
       .mockResolvedValueOnce(mockOk(JSON.stringify({ nl: [{ type: "text", value: "Hallo" }] })));
 
@@ -375,11 +376,11 @@ describe("llmTranslateBundle — retry on non-object response", () => {
       bundle: bundle!,
       sourceLocale: "en-gb",
       targetLocales: ["nl"],
-      openrouterApiKey: API_KEY,
+      client: mockClient,
       model: MODEL,
     });
 
-    expect(callOpenRouter).toHaveBeenCalledTimes(2);
+    expect(mockComplete).toHaveBeenCalledTimes(2);
     expect(result.data!.messages.find((m: NewMessageNested) => m.locale === "nl")).toBeDefined();
   });
 });
@@ -390,7 +391,7 @@ describe("llmTranslateBundle — retry on validation failure", () => {
     await insertSimpleBundle(project.db, "greet", "Hello");
     const [bundle] = await selectBundleNested(project.db).execute();
 
-    vi.mocked(callOpenRouter)
+    mockComplete
       // First attempt: nl pattern has wrong length
       .mockResolvedValueOnce(mockOk(JSON.stringify({ nl: [{ type: "text", value: "Hallo" }, { type: "text", value: "extra" }] })))
       // Second attempt: correct
@@ -400,11 +401,11 @@ describe("llmTranslateBundle — retry on validation failure", () => {
       bundle: bundle!,
       sourceLocale: "en-gb",
       targetLocales: ["nl"],
-      openrouterApiKey: API_KEY,
+      client: mockClient,
       model: MODEL,
     });
 
-    expect(callOpenRouter).toHaveBeenCalledTimes(2);
+    expect(mockComplete).toHaveBeenCalledTimes(2);
     const nl = result.data!.messages.find((m: NewMessageNested) => m.locale === "nl");
     expect(nl).toBeDefined();
   });
@@ -416,17 +417,17 @@ describe("llmTranslateBundle — connection error on last retry returns error", 
     await insertSimpleBundle(project.db, "greet", "Hello");
     const [bundle] = await selectBundleNested(project.db).execute();
 
-    vi.mocked(callOpenRouter).mockRejectedValue(new Error("connection refused"));
+    mockComplete.mockRejectedValue(new Error("connection refused"));
 
     const result = await llmTranslateBundle({
       bundle: bundle!,
       sourceLocale: "en-gb",
       targetLocales: ["nl"],
-      openrouterApiKey: API_KEY,
+      client: mockClient,
       model: MODEL,
     });
 
-    expect(callOpenRouter).toHaveBeenCalledTimes(1); // callOpenRouter owns network retries; throws propagate immediately
+    expect(mockComplete).toHaveBeenCalledTimes(1); // OpenRouterClient handles transport retries; throws propagate immediately
     expect(result.error).toMatch(/connection refused/);
   });
 });
@@ -440,7 +441,7 @@ describe("llmTranslateBundle — usage accumulation across retries", () => {
     const usage1 = { promptTokens: 10, completionTokens: 3, cachedTokens: 0, thinkingTokens: 0, totalTokens: 13 };
     const usage2 = { promptTokens: 8, completionTokens: 4, cachedTokens: 0, thinkingTokens: 0, totalTokens: 12 };
 
-    vi.mocked(callOpenRouter)
+    mockComplete
       .mockResolvedValueOnce({ content: "not json", usage: usage1 }) // parse fails, usage still counted
       .mockResolvedValueOnce({ content: JSON.stringify({ nl: [{ type: "text", value: "Hallo" }] }), usage: usage2 });
 
@@ -448,7 +449,7 @@ describe("llmTranslateBundle — usage accumulation across retries", () => {
       bundle: bundle!,
       sourceLocale: "en-gb",
       targetLocales: ["nl"],
-      openrouterApiKey: API_KEY,
+      client: mockClient,
       model: MODEL,
     });
 
@@ -489,7 +490,7 @@ describe("llmTranslateBundle — multiple source variants", () => {
     });
     const [bundle] = await selectBundleNested(project.db).execute();
 
-    vi.mocked(callOpenRouter)
+    mockComplete
       .mockResolvedValueOnce(mockOk(JSON.stringify({ nl: [{ type: "text", value: "1 item" }] })))
       .mockResolvedValueOnce(mockOk(JSON.stringify({ nl: [{ type: "text", value: "{count} items" }] })));
 
@@ -497,11 +498,11 @@ describe("llmTranslateBundle — multiple source variants", () => {
       bundle: bundle!,
       sourceLocale: "en-gb",
       targetLocales: ["nl"],
-      openrouterApiKey: API_KEY,
+      client: mockClient,
       model: MODEL,
     });
 
-    expect(callOpenRouter).toHaveBeenCalledTimes(2);
+    expect(mockComplete).toHaveBeenCalledTimes(2);
     const nl = result.data!.messages.find((m: NewMessageNested) => m.locale === "nl");
     expect(nl!.variants).toHaveLength(2);
   });
@@ -519,7 +520,7 @@ describe("llmTranslateBundles — happy path", () => {
     const bundles = await selectBundleNested(project.db).execute();
 
     // The batch call uses a key-based format; we need to return entries for all workMap keys
-    vi.mocked(callOpenRouter).mockResolvedValueOnce(
+    mockComplete.mockResolvedValueOnce(
       mockOk(
         JSON.stringify(
           Object.fromEntries(
@@ -536,14 +537,14 @@ describe("llmTranslateBundles — happy path", () => {
       bundles,
       sourceLocale: "en-gb",
       targetLocales: ["nl"],
-      openrouterApiKey: API_KEY,
+      client: mockClient,
       model: MODEL,
     });
 
     expect(result.results).toHaveLength(2);
     expect(result.results[0]!.error).toBeUndefined();
     expect(result.results[1]!.error).toBeUndefined();
-    expect(callOpenRouter).toHaveBeenCalledTimes(1);
+    expect(mockComplete).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -557,11 +558,11 @@ describe("llmTranslateBundles — all bundles already translated", () => {
       bundles,
       sourceLocale: "en-gb",
       targetLocales: ["nl"],
-      openrouterApiKey: API_KEY,
+      client: mockClient,
       model: MODEL,
     });
 
-    expect(callOpenRouter).not.toHaveBeenCalled();
+    expect(mockComplete).not.toHaveBeenCalled();
     expect(result.results[0]!.data).toBeDefined();
     expect(result.results[0]!.error).toBeUndefined();
   });
@@ -573,11 +574,11 @@ describe("llmTranslateBundles — empty bundle list", () => {
       bundles: [],
       sourceLocale: "en-gb",
       targetLocales: ["nl"],
-      openrouterApiKey: API_KEY,
+      client: mockClient,
       model: MODEL,
     });
 
-    expect(callOpenRouter).not.toHaveBeenCalled();
+    expect(mockComplete).not.toHaveBeenCalled();
     expect(result.results).toHaveLength(0);
     expect(result.usage.totalTokens).toBe(0);
   });
@@ -589,36 +590,36 @@ describe("llmTranslateBundles — JSON parse failure returns errors (not silent 
     await insertSimpleBundle(project.db, "greet", "Hello");
     const bundles = await selectBundleNested(project.db).execute();
 
-    vi.mocked(callOpenRouter).mockResolvedValue(mockOk("not valid json"));
+    mockComplete.mockResolvedValue(mockOk("not valid json"));
 
     const result = await llmTranslateBundles({
       bundles,
       sourceLocale: "en-gb",
       targetLocales: ["nl"],
-      openrouterApiKey: API_KEY,
+      client: mockClient,
       model: MODEL,
     });
 
-    expect(callOpenRouter).toHaveBeenCalledTimes(3); // MAX_RETRIES
+    expect(mockComplete).toHaveBeenCalledTimes(3); // MAX_RETRIES
     expect(result.results[0]!.error).toBeDefined();
     expect(result.results[0]!.error).toMatch(/parse/i);
   });
 });
 
 describe("llmTranslateBundles — API error propagates to all results", () => {
-  it("returns error for every bundle when callOpenRouter throws on all retries", async () => {
+  it("returns error for every bundle when client.complete throws", async () => {
     const project = await makeProject(["en-gb", "nl"]);
     await insertSimpleBundle(project.db, "a", "Hello");
     await insertSimpleBundle(project.db, "b", "Save");
     const bundles = await selectBundleNested(project.db).execute();
 
-    vi.mocked(callOpenRouter).mockRejectedValue(new Error("API down"));
+    mockComplete.mockRejectedValue(new Error("API down"));
 
     const result = await llmTranslateBundles({
       bundles,
       sourceLocale: "en-gb",
       targetLocales: ["nl"],
-      openrouterApiKey: API_KEY,
+      client: mockClient,
       model: MODEL,
     });
 
@@ -635,7 +636,7 @@ describe("llmTranslateBundles — retries on transient failures", () => {
     const bundles = await selectBundleNested(project.db).execute();
     const key = `${bundles[0]!.id}::${bundles[0]!.messages[0]!.variants[0]!.id}`;
 
-    vi.mocked(callOpenRouter)
+    mockComplete
       .mockResolvedValueOnce(mockOk("not json"))
       .mockResolvedValueOnce(mockOk(JSON.stringify({ [key]: { nl: [{ type: "text", value: "Hallo" }] } })));
 
@@ -643,11 +644,11 @@ describe("llmTranslateBundles — retries on transient failures", () => {
       bundles,
       sourceLocale: "en-gb",
       targetLocales: ["nl"],
-      openrouterApiKey: API_KEY,
+      client: mockClient,
       model: MODEL,
     });
 
-    expect(callOpenRouter).toHaveBeenCalledTimes(2);
+    expect(mockComplete).toHaveBeenCalledTimes(2);
     expect(result.results[0]!.error).toBeUndefined();
   });
 });
@@ -662,7 +663,7 @@ describe("llmTranslateBundles — usage accumulated across retries", () => {
     const badUsage = { promptTokens: 5, completionTokens: 1, cachedTokens: 0, thinkingTokens: 0, totalTokens: 6 };
     const goodUsage = { promptTokens: 8, completionTokens: 3, cachedTokens: 0, thinkingTokens: 0, totalTokens: 11 };
 
-    vi.mocked(callOpenRouter)
+    mockComplete
       .mockResolvedValueOnce({ content: "bad json", usage: badUsage })
       .mockResolvedValueOnce({ content: JSON.stringify({ [key]: { nl: [{ type: "text", value: "Hallo" }] } }), usage: goodUsage });
 
@@ -670,7 +671,7 @@ describe("llmTranslateBundles — usage accumulated across retries", () => {
       bundles,
       sourceLocale: "en-gb",
       targetLocales: ["nl"],
-      openrouterApiKey: API_KEY,
+      client: mockClient,
       model: MODEL,
     });
 
@@ -691,7 +692,7 @@ describe("llmTranslateBundles — bundle with missing source locale returns erro
     const mixedBundles = [...bundles, noSource as any];
     const key = `${bundles[0]!.id}::${bundles[0]!.messages[0]!.variants[0]!.id}`;
 
-    vi.mocked(callOpenRouter).mockResolvedValueOnce(
+    mockComplete.mockResolvedValueOnce(
       mockOk(JSON.stringify({ [key]: { nl: [{ type: "text", value: "Hallo" }] } })),
     );
 
@@ -699,7 +700,7 @@ describe("llmTranslateBundles — bundle with missing source locale returns erro
       bundles: mixedBundles,
       sourceLocale: "en-gb",
       targetLocales: ["nl"],
-      openrouterApiKey: API_KEY,
+      client: mockClient,
       model: MODEL,
     });
 
@@ -724,11 +725,11 @@ describe("llmTranslateBundles — all bundles missing source locale (mistyped --
       bundles,
       sourceLocale: "fr", // mistyped — not in any bundle
       targetLocales: ["nl"],
-      openrouterApiKey: API_KEY,
+      client: mockClient,
       model: MODEL,
     });
 
-    expect(callOpenRouter).not.toHaveBeenCalled();
+    expect(mockComplete).not.toHaveBeenCalled();
     expect(result.results).toHaveLength(2);
     expect(result.results[0]!.error).toMatch(/Source locale "fr" not found/);
     expect(result.results[1]!.error).toMatch(/Source locale "fr" not found/);

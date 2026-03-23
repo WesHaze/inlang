@@ -38,15 +38,13 @@ export class OpenRouterClient {
     siteName?: string;
   }) {
     this.apiKey = args.apiKey;
-    const headers: Record<string, string> = {};
-    if (args.siteUrl) headers["HTTP-Referer"] = args.siteUrl;
-    if (args.siteName) headers["X-Title"] = args.siteName;
 
     this.client = new OpenRouter({
       apiKey: args.apiKey,
-      headers,
-      maxRetries: 4,
-      timeout: 60_000,
+      httpReferer: args.siteUrl,
+      xTitle: args.siteName,
+      retryConfig: { strategy: "backoff", backoff: { initialInterval: 500, maxInterval: 8000, exponent: 2, maxElapsedTime: 60_000 }, retryConnectionErrors: true },
+      timeoutMs: 60_000,
     });
   }
 
@@ -58,9 +56,12 @@ export class OpenRouterClient {
     let result: Awaited<ReturnType<typeof this.client.chat.send>>;
     try {
       result = await this.client.chat.send({
-        model: args.model,
-        messages: args.messages as Parameters<typeof this.client.chat.send>[0]["messages"],
-        temperature: args.temperature ?? 0.1,
+        chatGenerationParams: {
+          model: args.model,
+          messages: args.messages as Parameters<typeof this.client.chat.send>[0]["chatGenerationParams"]["messages"],
+          temperature: args.temperature ?? 0.1,
+          stream: false,
+        },
       });
     } catch (err) {
       const status = (err as { status?: number }).status;
@@ -71,16 +72,16 @@ export class OpenRouterClient {
 
     const rawContent = result.choices[0]?.message?.content;
     const content = typeof rawContent === "string" ? rawContent : "";
-    const u = (result.usage ?? {}) as Record<string, unknown>;
+    const u = result.usage;
 
     return {
       content,
       usage: {
-        promptTokens: (u["prompt_tokens"] as number) ?? 0,
-        completionTokens: (u["completion_tokens"] as number) ?? 0,
-        cachedTokens: (u["prompt_tokens_details"] as Record<string, unknown>)?.["cached_tokens"] as number ?? 0,
-        thinkingTokens: (u["completion_tokens_details"] as Record<string, unknown>)?.["reasoning_tokens"] as number ?? 0,
-        totalTokens: (u["total_tokens"] as number) ?? 0,
+        promptTokens: u?.promptTokens ?? 0,
+        completionTokens: u?.completionTokens ?? 0,
+        cachedTokens: u?.promptTokensDetails?.cachedTokens ?? 0,
+        thinkingTokens: u?.completionTokensDetails?.reasoningTokens ?? 0,
+        totalTokens: u?.totalTokens ?? 0,
       },
     };
   }

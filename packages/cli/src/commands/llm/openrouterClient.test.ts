@@ -192,11 +192,11 @@ describe("OpenRouterClient", () => {
     return {
       choices: [{ message: { content, role: "assistant" } }],
       usage: {
-        prompt_tokens: 10,
-        completion_tokens: 5,
-        total_tokens: 15,
-        prompt_tokens_details: { cached_tokens: 2 },
-        completion_tokens_details: { reasoning_tokens: 0 },
+        promptTokens: 10,
+        completionTokens: 5,
+        totalTokens: 15,
+        promptTokensDetails: { cachedTokens: 2 },
+        completionTokensDetails: { reasoningTokens: 0 },
       },
     };
   }
@@ -227,7 +227,9 @@ describe("OpenRouterClient", () => {
     await client.complete({ model: "m", messages: [{ role: "user", content: "hi" }] });
 
     expect(mockSend).toHaveBeenCalledWith(
-      expect.objectContaining({ temperature: 0.1 }),
+      expect.objectContaining({
+        chatGenerationParams: expect.objectContaining({ temperature: 0.1 }),
+      }),
     );
   });
 
