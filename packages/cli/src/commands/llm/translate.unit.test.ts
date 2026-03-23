@@ -227,6 +227,29 @@ describe("llmTranslateCommandAction — model forwarded", () => {
 });
 
 // ---------------------------------------------------------------------------
+// invalid source locale
+// ---------------------------------------------------------------------------
+
+describe("llmTranslateCommandAction — invalid source locale", () => {
+  it("throws when no bundle contains the source locale", async () => {
+    const project = await makeProject(["en-gb", "nl"]);
+    await insertBundle(project.db, "greet"); // inserted with locale "en-gb"
+
+    await expect(
+      llmTranslateCommandAction({
+        project,
+        sourceLocale: "fr", // not present in any bundle
+        targetLocales: ["nl"],
+        model: DEFAULT_MODEL,
+        apiKey: "test-key",
+      }),
+    ).rejects.toThrow(/fr/);
+
+    expect(llmTranslateBundles).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // --source-locale / source locale in target list
 // ---------------------------------------------------------------------------
 
