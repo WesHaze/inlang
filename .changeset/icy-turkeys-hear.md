@@ -2,4 +2,6 @@
 "@inlang/plugin-icu1": minor
 ---
 
-Compile ICU exact plural and ordinal cases through a dedicated exact selector so exact arms stay reachable with the existing Paraglide compiler, and serialize that shape back to `=n` ICU syntax.
+Lower ICU exact `plural` and `selectordinal` cases through a dedicated exact selector during import, while keeping category cases on the plural selector. This keeps exact `=n` arms reachable with the existing Paraglide compiler and serializes the imported shape back to normal ICU `=n` syntax on export.
+
+This is a minor release because the imported inlang message shape changes for ICU exact plural and ordinal cases.
