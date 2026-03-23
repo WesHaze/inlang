@@ -202,43 +202,8 @@ export async function llmTranslateBundle(
           continue;
         }
 
-        const targetMessage = copy.messages.find(
-          (m: NewMessageNested) => m.locale === targetLocale,
-        );
-
         anyTranslated = true;
-        if (targetMessage) {
-          const existingVariant = findMatchingVariant(
-            targetMessage.variants,
-            sourceVariant.matches ?? [],
-          );
-          if (existingVariant) {
-            existingVariant.pattern = validation.pattern;
-          } else {
-            const newVariant: NewVariant = {
-              id: randomUUID(),
-              messageId: targetMessage.id ?? randomUUID(),
-              matches: sourceVariant.matches,
-              pattern: validation.pattern,
-            };
-            targetMessage.variants.push(newVariant);
-          }
-        } else {
-          const newMessageId = randomUUID();
-          const newVariant: NewVariant = {
-            id: randomUUID(),
-            messageId: newMessageId,
-            matches: sourceVariant.matches,
-            pattern: validation.pattern,
-          };
-          const newMessage: NewMessageNested = {
-            ...sourceMessage,
-            id: newMessageId,
-            locale: targetLocale,
-            variants: [newVariant],
-          };
-          copy.messages.push(newMessage);
-        }
+        applyVariantTranslation(copy, sourceMessage, sourceVariant, targetLocale, validation.pattern);
       }
 
       remainingLocales = nextRemainingLocales;
@@ -339,8 +304,8 @@ export async function llmTranslateBundles(
           { role: "user", content: userContent },
         ],
         apiKey,
-        siteUrl: process.env.INLANG_OPENROUTER_SITE_URL,
-        siteName: process.env.INLANG_OPENROUTER_SITE_NAME,
+        siteUrl: process.env[OPENROUTER_SITE_URL_ENV],
+        siteName: process.env[OPENROUTER_SITE_NAME_ENV],
       });
     } catch (err) {
       // callOpenRouter already retried internally — propagate immediately.
@@ -403,28 +368,7 @@ export async function llmTranslateBundles(
       }
 
       translatedIndices.add(copyIdx);
-      const targetMessage = copy.messages.find((m) => m.locale === targetLocale);
-      if (targetMessage) {
-        const existingVariant = findMatchingVariant(targetMessage.variants, sourceVariant.matches ?? []);
-        if (existingVariant) {
-          existingVariant.pattern = validation.pattern;
-        } else {
-          targetMessage.variants.push({
-            id: randomUUID(),
-            messageId: targetMessage.id ?? randomUUID(),
-            matches: sourceVariant.matches,
-            pattern: validation.pattern,
-          });
-        }
-      } else {
-        const newMessageId = randomUUID();
-        copy.messages.push({
-          ...sourceMessage,
-          id: newMessageId,
-          locale: targetLocale,
-          variants: [{ id: randomUUID(), messageId: newMessageId, matches: sourceVariant.matches, pattern: validation.pattern }],
-        });
-      }
+      applyVariantTranslation(copy, sourceMessage, sourceVariant, targetLocale, validation.pattern);
     }
   }
 
@@ -440,6 +384,41 @@ export async function llmTranslateBundles(
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Writes a validated translated pattern into `copy` for `targetLocale`.
+ * Creates the message and variant if they don't exist yet.
+ */
+function applyVariantTranslation(
+  copy: NewBundleNested,
+  sourceMessage: NewMessageNested,
+  sourceVariant: NewVariant,
+  targetLocale: string,
+  pattern: Pattern,
+): void {
+  const targetMessage = copy.messages.find((m) => m.locale === targetLocale);
+  if (targetMessage) {
+    const existingVariant = findMatchingVariant(targetMessage.variants, sourceVariant.matches ?? []);
+    if (existingVariant) {
+      existingVariant.pattern = pattern;
+    } else {
+      targetMessage.variants.push({
+        id: randomUUID(),
+        messageId: targetMessage.id ?? randomUUID(),
+        matches: sourceVariant.matches,
+        pattern,
+      });
+    }
+  } else {
+    const newMessageId = randomUUID();
+    copy.messages.push({
+      ...sourceMessage,
+      id: newMessageId,
+      locale: targetLocale,
+      variants: [{ id: randomUUID(), messageId: newMessageId, matches: sourceVariant.matches, pattern }],
+    });
+  }
 }
 
 function isEmptyPattern(pattern: Pattern): boolean {

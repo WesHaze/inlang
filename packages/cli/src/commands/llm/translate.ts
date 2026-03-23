@@ -63,6 +63,15 @@ export const translate = new Command()
         ? (options.targetLocales as string[]).flatMap((s: string) => s.split(","))
         : settings.locales.filter((l: string) => l !== sourceLocale);
 
+      const projectLocales = new Set(settings.locales as string[]);
+      for (const locale of targetLocales) {
+        if (!projectLocales.has(locale)) {
+          log.warn(
+            `Target locale "${locale}" is not in the project's locales array. It will be created but may not be picked up by your app.`,
+          );
+        }
+      }
+
       const { errorCount } = await llmTranslateCommandAction({
         project,
         sourceLocale,
@@ -136,17 +145,6 @@ export async function llmTranslateCommandAction(
     );
   }
 
-  // Warn about target locales that are not in the project's locale list
-  const settings = await project.settings.get();
-  const projectLocales = new Set(settings.locales as string[]);
-  for (const locale of targetLocales) {
-    if (!projectLocales.has(locale)) {
-      log.warn(
-        `Target locale "${locale}" is not in the project's locales array. It will be created but may not be picked up by your app.`,
-      );
-    }
-  }
-
   if (dryRun) {
     log.info(
       `Dry run: would translate ${bundles.length} bundle(s) in batches of ${batchSize} from "${sourceLocale}" to [${targetLocales.join(", ")}] using model "${model}".`,
@@ -168,40 +166,35 @@ export async function llmTranslateCommandAction(
   let successCount = 0;
   let errorCount = 0;
 
-  const batchResults = await Promise.all(
-    chunks.map((chunk, chunkIdx) =>
-      llmTranslateBundles({ bundles: chunk, sourceLocale, targetLocales, model, openrouterApiKey: apiKey, context, force, quiet })
-        .then(async ({ results, usage }) => {
-          totalTokens += usage.totalTokens;
-          await Promise.all(
-            results.map(async (result, i) => {
-              const bundle = chunk[i]!;
-              if (result.error) {
-                errorCount++;
-                log.warn(`  [${bundle.id}] error: ${result.error}`);
-                return;
-              }
-              if (result.data) {
-                try {
-                  await upsertBundleNested(project.db, result.data);
-                  if (result.translated) successCount++;
-                } catch (upsertErr) {
-                  errorCount++;
-                  log.warn(
-                    `  [${bundle.id}] failed to upsert: ${upsertErr instanceof Error ? upsertErr.message : String(upsertErr)}`,
-                  );
-                }
-              }
-            }),
-          );
-          if (!quiet) {
-            log.info(`  [batch ${chunkIdx + 1}/${chunks.length}] ${usage.totalTokens} tokens`);
+  await Promise.all(
+    chunks.map(async (chunk, chunkIdx) => {
+      const { results, usage } = await llmTranslateBundles({ bundles: chunk, sourceLocale, targetLocales, model, openrouterApiKey: apiKey, context, force, quiet });
+      totalTokens += usage.totalTokens;
+      for (let i = 0; i < results.length; i++) {
+        const result = results[i]!;
+        const bundle = chunk[i]!;
+        if (result.error) {
+          errorCount++;
+          log.warn(`  [${bundle.id}] error: ${result.error}`);
+          continue;
+        }
+        if (result.data) {
+          try {
+            await upsertBundleNested(project.db, result.data);
+            if (result.translated) successCount++;
+          } catch (upsertErr) {
+            errorCount++;
+            log.warn(
+              `  [${bundle.id}] failed to upsert: ${upsertErr instanceof Error ? upsertErr.message : String(upsertErr)}`,
+            );
           }
-        }),
-    ),
+        }
+      }
+      if (!quiet) {
+        log.info(`  [batch ${chunkIdx + 1}/${chunks.length}] ${usage.totalTokens} tokens`);
+      }
+    }),
   );
-
-  void batchResults; // results processed inline above
 
   log.success(
     `LLM translate complete. ${successCount} bundle(s) translated, ${errorCount} error(s). Total tokens used: ${totalTokens}.`,

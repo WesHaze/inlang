@@ -211,7 +211,7 @@ npx @inlang/cli llm translate --project ./project.inlang
 | `--targetLocales <locales...>` | all non-source locales | Target locales. Space-separated or comma-separated, e.g. `--targetLocales fr de` or `--targetLocales fr,de` |
 | `--context <text>` | — | Inline brand/style instructions for the LLM |
 | `--context-file <path>` | — | Path to a markdown file with brand/style instructions (takes precedence over `--context`) |
-| `--batch-size <n>` | `200` | Number of bundles per LLM call |
+| `--batch-size <n>` | `10` | Number of bundles per LLM call |
 | `--force` | false | Overwrite existing non-empty translations |
 | `--dry-run` | false | Preview what would be translated without writing or calling the API |
 | `-q, --quiet` | false | Suppress per-batch token log lines |

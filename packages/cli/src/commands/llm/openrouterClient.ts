@@ -30,8 +30,8 @@ export type OpenRouterResponse = {
  * retry on transient errors (HTTP 429, 5xx).
  *
  * Required env vars used by callers:
- *   OPENROUTER_SITE_URL  → HTTP-Referer header
- *   OPENROUTER_SITE_NAME → X-Title header
+ *   INLANG_OPENROUTER_SITE_URL  → HTTP-Referer header
+ *   INLANG_OPENROUTER_SITE_NAME → X-Title header
  */
 export async function callOpenRouter(args: {
   model: string;
