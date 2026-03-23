@@ -201,10 +201,10 @@ export async function llmTranslateCommandAction(
           log.warn(`  [${bundle.id}] error: ${result.error}`);
           continue;
         }
-        if (result.data) {
+        if (result.data && result.translated) {
           try {
             await upsertBundleNested(project.db, result.data);
-            if (result.translated) chunkSuccess++;
+            chunkSuccess++;
           } catch (upsertErr) {
             chunkErrors++;
             log.warn(
