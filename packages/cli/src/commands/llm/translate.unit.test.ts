@@ -532,6 +532,69 @@ describe("llmTranslateCommandAction — result aggregation", () => {
 // ---------------------------------------------------------------------------
 
 describe("llmTranslateCommandAction — strict mode (failedCount)", () => {
+  it("throws when strict=true and failedCount > 0", async () => {
+    const project = await makeProject();
+    await insertBundle(project.db, "greet");
+
+    vi.mocked(llmTranslateBundles).mockResolvedValue({
+      results: [{ ...makeMockResult("greet"), attempted: true, failedLocales: [] }],
+      usage: emptyUsage,
+    });
+
+    await expect(
+      llmTranslateCommandAction({
+        project,
+        sourceLocale: "en-gb",
+        targetLocales: ["nl"],
+        model: DEFAULT_MODEL,
+        apiKey: "test-key",
+        strict: true,
+      }),
+    ).rejects.toThrow(/1 bundle/);
+  });
+
+  it("does not throw when strict=true but failedCount=0", async () => {
+    const project = await makeProject();
+    await insertBundle(project.db, "greet");
+
+    vi.mocked(llmTranslateBundles).mockResolvedValue({
+      results: [{ ...makeMockResult("greet"), translated: true, failedLocales: [] }],
+      usage: emptyUsage,
+    });
+
+    await expect(
+      llmTranslateCommandAction({
+        project,
+        sourceLocale: "en-gb",
+        targetLocales: ["nl"],
+        model: DEFAULT_MODEL,
+        apiKey: "test-key",
+        strict: true,
+      }),
+    ).resolves.not.toThrow();
+  });
+
+  it("does not throw when strict=false even if failedCount > 0", async () => {
+    const project = await makeProject();
+    await insertBundle(project.db, "greet");
+
+    vi.mocked(llmTranslateBundles).mockResolvedValue({
+      results: [{ ...makeMockResult("greet"), attempted: true, failedLocales: [] }],
+      usage: emptyUsage,
+    });
+
+    await expect(
+      llmTranslateCommandAction({
+        project,
+        sourceLocale: "en-gb",
+        targetLocales: ["nl"],
+        model: DEFAULT_MODEL,
+        apiKey: "test-key",
+        strict: false,
+      }),
+    ).resolves.not.toThrow();
+  });
+
   it("returns failedCount > 0 when bundles were attempted but not fully translated", async () => {
     const project = await makeProject();
     await insertBundle(project.db, "greet");

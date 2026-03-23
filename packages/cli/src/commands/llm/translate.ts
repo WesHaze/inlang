@@ -101,7 +101,7 @@ export const translate = new Command()
         }
       }
 
-      const { successCount, errorCount, failedCount } = await llmTranslateCommandAction({
+      const { successCount, errorCount } = await llmTranslateCommandAction({
         project,
         sourceLocale,
         targetLocales,
@@ -121,7 +121,6 @@ export const translate = new Command()
           await saveProjectToDirectory({ fs, path: args.project, project });
         }
         if (errorCount > 0) exitCode = 1;
-        if (options.strict && failedCount > 0) exitCode = 1;
       }
     } catch (error) {
       logError(error);
@@ -263,6 +262,11 @@ export async function llmTranslateCommandAction(
     log.warn(
       `Could not translate ${failedIds.length} bundle(s) (LLM validation failed for all locales):\n${failedIds.map((id) => `  - ${id}`).join("\n")}`,
     );
+    if (args.strict) {
+      throw new Error(
+        `Translation incomplete: ${failedCount} bundle(s) could not be fully translated. Use --strict to treat this as a hard failure or remove --strict to allow partial results.`,
+      );
+    }
   }
 
   return { successCount, errorCount, failedCount };
