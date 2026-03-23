@@ -108,7 +108,7 @@ describe("parseMessage", () => {
     const matches = parsed.variants.map((variant) => variant.matches ?? []);
     expect(matches).toEqual(
       expect.arrayContaining([
-        [{ type: "literal-match", key: "countPluralOffset1", value: "=0" }],
+        [{ type: "literal-match", key: "countPluralOffset1", value: "0" }],
         [{ type: "literal-match", key: "countPluralOffset1", value: "one" }],
         [{ type: "catchall-match", key: "countPluralOffset1" }],
       ]),

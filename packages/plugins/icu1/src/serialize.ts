@@ -91,7 +91,7 @@ function serializeVariants(
   }
 
   const cases = Array.from(groups.entries()).map(([key, groupVariants]) => {
-    const caseKey = caseKeyFromMatch(key);
+    const caseKey = caseKeyFromMatch(key, selectorConfig.type);
     const tokens = serializeVariants(
       groupVariants,
       restSelectors,
@@ -120,9 +120,19 @@ function matchKey(match: Variant["matches"][number] | undefined): string {
   return match.value;
 }
 
-function caseKeyFromMatch(match: string): string {
+function caseKeyFromMatch(
+  match: string,
+  selectorType: "select" | "plural" | "selectordinal",
+): string {
   if (match === "*" || match === "other") return "other";
+  if (selectorType !== "select" && isNumericLiteralKey(match)) {
+    return `=${match}`;
+  }
   return match;
+}
+
+function isNumericLiteralKey(value: string): boolean {
+  return /^-?(?:0|[1-9]\d*)(?:\.\d+)?$/.test(value);
 }
 
 function removeMatchForSelector(

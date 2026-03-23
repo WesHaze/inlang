@@ -163,7 +163,7 @@ function expandTokens(
 
         const nextBranches: Branch[] = [];
         for (const selectCase of token.cases) {
-          const match = matchForCase(selectorName, selectCase.key);
+          const match = matchForCase(selectorName, selectCase.key, token.type);
           for (const current of branches) {
             const branchMatches = match
               ? [...current.matches, match]
@@ -264,7 +264,11 @@ function ensurePluralSelector(
   return selectorName;
 }
 
-function matchForCase(selectorName: string, key: string): Match | undefined {
+function matchForCase(
+  selectorName: string,
+  key: string,
+  selectorType: "select" | "plural" | "selectordinal",
+): Match | undefined {
   if (key === "other") {
     return {
       type: "catchall-match",
@@ -272,11 +276,20 @@ function matchForCase(selectorName: string, key: string): Match | undefined {
     };
   }
 
+  const normalizedKey =
+    selectorType !== "select" && isExactPluralCaseKey(key)
+      ? key.slice(1)
+      : key;
+
   return {
     type: "literal-match",
     key: selectorName,
-    value: key,
+    value: normalizedKey,
   };
+}
+
+function isExactPluralCaseKey(key: string): boolean {
+  return /^=-?(?:0|[1-9]\d*)(?:\.\d+)?$/.test(key);
 }
 
 function functionAnnotation(
