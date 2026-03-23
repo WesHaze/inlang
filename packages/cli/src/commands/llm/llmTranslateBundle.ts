@@ -43,7 +43,7 @@ export type LlmTranslateBundleResult = {
   usage?: OpenRouterUsage;
 };
 
-const MAX_RETRIES = 3;
+export const MAX_RETRIES = 3;
 const RETRY_BASE_MS = 500;
 const LOG_PREFIX = "[llm-translate]";
 

@@ -9,7 +9,7 @@ import {
 import { projectOption } from "../../utilities/globalFlags.js";
 import { getInlangProject } from "../../utilities/getInlangProject.js";
 import { log, logError } from "../../utilities/log.js";
-import { llmTranslateBundles } from "./llmTranslateBundle.js";
+import { llmTranslateBundles, MAX_RETRIES } from "./llmTranslateBundle.js";
 import {
   OpenRouterClient,
   type OpenRouterUsage,
@@ -68,7 +68,7 @@ export const translate = new Command()
       if (isNaN(n) || n < 1) throw new Error(`--max-retries must be a positive integer, got: "${v}"`);
       return n;
     },
-    3,
+    MAX_RETRIES,
   )
   .option("--api-key <key>", "OpenRouter API key (overrides INLANG_OPENROUTER_API_KEY env var).")
   .description("Translate bundles using an LLM via OpenRouter.")
@@ -158,7 +158,7 @@ export async function llmTranslateCommandAction(
     force = false,
     dryRun = false,
     quiet = false,
-    maxRetries = 3,
+    maxRetries = MAX_RETRIES,
   } = args;
 
   const targetLocales = [...new Set(args.targetLocales.map((s) => s.trim()).filter(Boolean))];

@@ -11,7 +11,7 @@ import {
   type NewMessageNested,
   type NewVariant,
 } from "@inlang/sdk";
-import { llmTranslateBundle, llmTranslateBundles } from "./llmTranslateBundle.js";
+import { llmTranslateBundle, llmTranslateBundles, MAX_RETRIES } from "./llmTranslateBundle.js";
 import type { OpenRouterClient } from "./openrouterClient.js";
 
 const mockComplete = vi.fn();
@@ -660,7 +660,7 @@ describe("llmTranslateBundles — JSON parse failure returns errors (not silent 
       model: MODEL,
     });
 
-    expect(mockComplete).toHaveBeenCalledTimes(3); // MAX_RETRIES
+    expect(mockComplete).toHaveBeenCalledTimes(MAX_RETRIES);
     expect(result.results[0]!.error).toBeDefined();
     expect(result.results[0]!.error).toMatch(/parse/i);
   });
