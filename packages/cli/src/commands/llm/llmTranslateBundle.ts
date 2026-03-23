@@ -116,7 +116,7 @@ export async function llmTranslateBundle(
 
   // Nothing to translate — return unchanged copy immediately (no API call)
   if (work.size === 0) {
-    return { data: copy, usage: emptyUsage() };
+    return { data: copy, attempted: false, usage: emptyUsage() };
   }
 
   const totalUsage: OpenRouterUsage = {
@@ -214,7 +214,7 @@ export async function llmTranslateBundle(
     }
   }
 
-  return { data: copy, translated: anyTranslated, usage: totalUsage };
+  return { data: copy, translated: anyTranslated, attempted: true, usage: totalUsage };
 }
 
 export async function llmTranslateBundles(

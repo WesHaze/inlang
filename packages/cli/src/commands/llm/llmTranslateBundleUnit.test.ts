@@ -149,6 +149,51 @@ describe("llmTranslateBundle — source locale in target list", () => {
 });
 
 // ---------------------------------------------------------------------------
+// llmTranslateBundle — attempted field
+// ---------------------------------------------------------------------------
+
+describe("llmTranslateBundle — attempted field", () => {
+  it("returns attempted=true when translation work was queued (even if all retries fail)", async () => {
+    const project = await makeProject(["en-gb", "nl"]);
+    await insertSimpleBundle(project.db, "greet", "Hello");
+    const [bundle] = await selectBundleNested(project.db).execute();
+
+    // Always returns a pattern with wrong length — all retries fail
+    mockComplete.mockResolvedValue(
+      mockOk(JSON.stringify({ nl: [{ type: "text", value: "Hallo" }, { type: "text", value: "extra" }] })),
+    );
+
+    const result = await llmTranslateBundle({
+      bundle: bundle!,
+      sourceLocale: "en-gb",
+      targetLocales: ["nl"],
+      client: mockClient,
+      model: MODEL,
+    });
+
+    expect(result.attempted).toBe(true);
+    expect(result.translated).toBeFalsy();
+  });
+
+  it("returns attempted=false when there is no work to do (already translated)", async () => {
+    const project = await makeProject(["en-gb", "nl"]);
+    await insertSimpleBundle(project.db, "greet", "Hello", "Hallo");
+    const [bundle] = await selectBundleNested(project.db).execute();
+
+    const result = await llmTranslateBundle({
+      bundle: bundle!,
+      sourceLocale: "en-gb",
+      targetLocales: ["nl"],
+      client: mockClient,
+      model: MODEL,
+    });
+
+    expect(result.attempted).toBe(false);
+    expect(mockComplete).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // llmTranslateBundle — bundle with zero source variants
 // ---------------------------------------------------------------------------
 
