@@ -130,6 +130,34 @@ describe("rebuildPatternFromString", () => {
     }
   });
 
+  it("handles emoji and symbols directly adjacent to {varName} with no whitespace", () => {
+    // e.g. source "🍆{name}" — emoji immediately before variable, no space
+    const source: Pattern = [
+      { type: "text", value: "🍆" },
+      { type: "expression", arg: { type: "variable-reference", name: "name" } },
+    ];
+    const result = rebuildPatternFromString("🍆{name}", source);
+    expect(result).toEqual([
+      { type: "text", value: "🍆" },
+      { type: "expression", arg: { type: "variable-reference", name: "name" } },
+    ]);
+    expect(validateTranslatedPattern(source, result).valid).toBe(true);
+  });
+
+  it("handles symbol immediately after {varName} with no whitespace", () => {
+    // e.g. source "{count}%" — percent sign directly after variable
+    const source: Pattern = [
+      { type: "expression", arg: { type: "variable-reference", name: "count" } },
+      { type: "text", value: "%" },
+    ];
+    const result = rebuildPatternFromString("{count}%", source);
+    expect(result).toEqual([
+      { type: "expression", arg: { type: "variable-reference", name: "count" } },
+      { type: "text", value: "%" },
+    ]);
+    expect(validateTranslatedPattern(source, result).valid).toBe(true);
+  });
+
   it("result passes validateTranslatedPattern after rebuild", () => {
     const source: Pattern = [
       { type: "text", value: "Remove " },
