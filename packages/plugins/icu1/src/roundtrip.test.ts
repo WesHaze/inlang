@@ -160,6 +160,20 @@ test("roundtrip: nested selectors with shared prefixes", async () => {
   expect(exported).toStrictEqual(input);
 });
 
+test("roundtrip: shared nested plural gains exact branch later", async () => {
+  const input = {
+    en: {
+      nested:
+        "{gender, select, male {{n, plural, one {one} other {many}}} female {{n, plural, =0 {zero} other {many}}} other {fallback}}",
+    },
+  };
+
+  const imported = await runImportFiles(input);
+  const exported = await runExportFilesParsed(imported);
+
+  expect(exported).toStrictEqual(input);
+});
+
 test("roundtrip: complex function params", async () => {
   const input = {
     en: {

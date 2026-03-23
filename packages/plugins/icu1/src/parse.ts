@@ -44,6 +44,7 @@ type ParseContext = {
   localVariables: Map<string, LocalVariable>;
   selectors: string[];
   pluralSelectors: Map<string, PluralSelector>;
+  exactPluralSelectorKeys: Set<string>;
 };
 
 const NULL_BRANCH: Branch = { pattern: [], matches: [] };
@@ -62,6 +63,7 @@ export function parseMessage(args: {
     localVariables: new Map(),
     selectors: [],
     pluralSelectors: new Map(),
+    exactPluralSelectorKeys: collectExactPluralSelectorKeys(tokens),
   };
 
   const branches = expandTokens(tokens, NULL_BRANCH, context, undefined);
@@ -150,9 +152,17 @@ function expandTokens(
       case "plural":
       case "selectordinal": {
         ensureInputVariable(context, token.arg);
-        const hasExactCases =
-          token.type !== "select" &&
-          token.cases.some((selectCase) => isExactPluralCaseKey(selectCase.key));
+        const pluralSelectorKey =
+          token.type === "select"
+            ? undefined
+            : createPluralSelectorKey({
+                arg: token.arg,
+                type: token.type,
+                offset: token.pluralOffset,
+              });
+        const withExactSelector =
+          pluralSelectorKey !== undefined &&
+          context.exactPluralSelectorKeys.has(pluralSelectorKey);
         const selectorName =
           token.type === "select"
             ? token.arg
@@ -160,24 +170,17 @@ function expandTokens(
                 arg: token.arg,
                 type: token.type,
                 offset: token.pluralOffset,
-                withExactSelector: hasExactCases,
+                withExactSelector,
               }).selectorName;
         const pluralSelector =
           token.type === "select"
             ? undefined
-            : context.pluralSelectors.get(
-                `${token.arg}|${token.type}|${token.pluralOffset ?? 0}`,
-              );
-        if (
-          hasExactCases &&
-          pluralSelector?.exactSelectorName &&
-          !context.selectors.includes(pluralSelector.exactSelectorName)
-        ) {
-          context.selectors.push(pluralSelector.exactSelectorName);
-        }
-        if (!context.selectors.includes(selectorName)) {
-          context.selectors.push(selectorName);
-        }
+            : context.pluralSelectors.get(pluralSelectorKey!);
+        ensureSelectorOrder(
+          context,
+          selectorName,
+          pluralSelector?.exactSelectorName,
+        );
 
         const nextBranches: Branch[] = [];
         for (const selectCase of sortSelectCases(token.cases, token.type)) {
@@ -235,7 +238,7 @@ function ensurePluralSelector(
     withExactSelector: boolean;
   },
 ): PluralSelector {
-  const key = `${args.arg}|${args.type}|${args.offset ?? 0}`;
+  const key = createPluralSelectorKey(args);
   const existing = context.pluralSelectors.get(key);
   if (existing) {
     if (args.withExactSelector && !existing.exactSelectorName) {
@@ -305,6 +308,42 @@ function ensurePluralSelector(
   context.pluralSelectors.set(key, pluralSelector);
 
   return pluralSelector;
+}
+
+function ensureSelectorOrder(
+  context: ParseContext,
+  selectorName: string,
+  exactSelectorName?: string,
+) {
+  if (!exactSelectorName) {
+    if (!context.selectors.includes(selectorName)) {
+      context.selectors.push(selectorName);
+    }
+    return;
+  }
+
+  const exactIndex = context.selectors.indexOf(exactSelectorName);
+  const selectorIndex = context.selectors.indexOf(selectorName);
+
+  if (exactIndex === -1 && selectorIndex === -1) {
+    context.selectors.push(exactSelectorName, selectorName);
+    return;
+  }
+
+  if (exactIndex === -1 && selectorIndex !== -1) {
+    context.selectors.splice(selectorIndex, 0, exactSelectorName);
+    return;
+  }
+
+  if (exactIndex !== -1 && selectorIndex === -1) {
+    context.selectors.splice(exactIndex + 1, 0, selectorName);
+    return;
+  }
+
+  if (exactIndex > selectorIndex) {
+    context.selectors.splice(exactIndex, 1);
+    context.selectors.splice(selectorIndex, 0, exactSelectorName);
+  }
 }
 
 function createExactSelector(
@@ -377,6 +416,46 @@ function matchesForCase(
 
 function isExactPluralCaseKey(key: string): boolean {
   return /^=-?(?:0|[1-9]\d*)(?:\.\d+)?$/.test(key);
+}
+
+function collectExactPluralSelectorKeys(tokens: TokenList): Set<string> {
+  const keys = new Set<string>();
+
+  for (const token of tokens) {
+    if (token.type === "plural" || token.type === "selectordinal") {
+      if (token.cases.some((selectCase) => isExactPluralCaseKey(selectCase.key))) {
+        keys.add(
+          createPluralSelectorKey({
+            arg: token.arg,
+            type: token.type,
+            offset: token.pluralOffset,
+          }),
+        );
+      }
+    }
+
+    if (
+      token.type === "select" ||
+      token.type === "plural" ||
+      token.type === "selectordinal"
+    ) {
+      for (const selectCase of token.cases) {
+        for (const key of collectExactPluralSelectorKeys(selectCase.tokens)) {
+          keys.add(key);
+        }
+      }
+    }
+  }
+
+  return keys;
+}
+
+function createPluralSelectorKey(args: {
+  arg: string;
+  type: "plural" | "selectordinal";
+  offset?: number;
+}): string {
+  return `${args.arg}|${args.type}|${args.offset ?? 0}`;
 }
 
 function sortSelectCases(

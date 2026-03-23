@@ -214,6 +214,44 @@ describe("parseMessage", () => {
     ]);
   });
 
+  it("shares exact plural selectors across nested branches", () => {
+    const parsed = parseMessage({
+      ...baseArgs,
+      messageSource:
+        "{gender, select, male {{n, plural, one {one} other {many}}} female {{n, plural, =0 {zero} other {many}}} other {fallback}}",
+    });
+
+    expect(parsed.selectors).toEqual([
+      { type: "variable-reference", name: "gender" },
+      { type: "variable-reference", name: "nPluralExact" },
+      { type: "variable-reference", name: "nPlural" },
+    ]);
+
+    expect(parsed.variants.map((variant) => variant.matches ?? [])).toEqual([
+      [
+        { type: "literal-match", key: "gender", value: "male" },
+        { type: "catchall-match", key: "nPluralExact" },
+        { type: "literal-match", key: "nPlural", value: "one" },
+      ],
+      [
+        { type: "literal-match", key: "gender", value: "male" },
+        { type: "catchall-match", key: "nPluralExact" },
+        { type: "catchall-match", key: "nPlural" },
+      ],
+      [
+        { type: "literal-match", key: "gender", value: "female" },
+        { type: "literal-match", key: "nPluralExact", value: "0" },
+        { type: "catchall-match", key: "nPlural" },
+      ],
+      [
+        { type: "literal-match", key: "gender", value: "female" },
+        { type: "catchall-match", key: "nPluralExact" },
+        { type: "catchall-match", key: "nPlural" },
+      ],
+      [{ type: "catchall-match", key: "gender" }],
+    ]);
+  });
+
   it("avoids local variable name collisions with input variables", () => {
     const parsed = parseMessage({
       ...baseArgs,

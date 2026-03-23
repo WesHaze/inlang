@@ -204,6 +204,35 @@ function resolveSelectorConfig(
 }
 
 function resolvePluralSelectorPair(
+  firstSelector: VariableReference,
+  secondSelector: VariableReference,
+  declarations: Declaration[],
+):
+  | {
+      exactSelector: VariableReference;
+      pluralSelector: VariableReference;
+      config: {
+        type: "plural" | "selectordinal";
+        arg: string;
+        offset?: number;
+      };
+    }
+  | undefined {
+  return (
+    tryResolvePluralSelectorPair(
+      firstSelector,
+      secondSelector,
+      declarations,
+    ) ??
+    tryResolvePluralSelectorPair(
+      secondSelector,
+      firstSelector,
+      declarations,
+    )
+  );
+}
+
+function tryResolvePluralSelectorPair(
   exactSelector: VariableReference,
   pluralSelector: VariableReference,
   declarations: Declaration[],
