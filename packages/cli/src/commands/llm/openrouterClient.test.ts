@@ -132,7 +132,7 @@ describe("callOpenRouter", () => {
 
     await expect(callOpenRouter(BASE_ARGS)).rejects.toThrow("connection refused");
     expect(fetch).toHaveBeenCalledTimes(5);
-  });
+  }, 15_000); // backoff: ~500 + 1000 + 2000 + 4000 ms ≈ 7.5 s
 
   it("returns empty content string when choices[0] is missing", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(
