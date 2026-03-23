@@ -12,12 +12,25 @@ import { log, logError } from "../../utilities/log.js";
 import { llmTranslateBundles } from "./llmTranslateBundle.js";
 import {
   OpenRouterClient,
+  type OpenRouterUsage,
   OPENROUTER_API_KEY_ENV,
   OPENROUTER_SITE_URL_ENV,
   OPENROUTER_SITE_NAME_ENV,
 } from "./openrouterClient.js";
 
 export const DEFAULT_MODEL = "openai/gpt-4o-mini";
+
+/** @internal exported for testing */
+export function formatUsage(usage: OpenRouterUsage): string {
+  const parts: string[] = [];
+  if (usage.promptTokens > 0)     parts.push(`prompt: ${usage.promptTokens}`);
+  if (usage.completionTokens > 0) parts.push(`completion: ${usage.completionTokens}`);
+  if (usage.cachedTokens > 0)     parts.push(`cached: ${usage.cachedTokens}`);
+  if (usage.thinkingTokens > 0)   parts.push(`thinking: ${usage.thinkingTokens}`);
+  return parts.length > 0
+    ? `${usage.totalTokens} tokens (${parts.join(", ")})`
+    : `${usage.totalTokens} tokens`;
+}
 
 export const translate = new Command()
   .command("translate")

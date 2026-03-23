@@ -8,13 +8,39 @@ import {
   loadProjectInMemory,
   newProject,
 } from "@inlang/sdk";
-import { llmTranslateCommandAction, DEFAULT_MODEL } from "./translate.js";
+import { llmTranslateCommandAction, DEFAULT_MODEL, formatUsage } from "./translate.js";
 import { OpenRouterClient, OPENROUTER_API_KEY_ENV } from "./openrouterClient.js";
 
 vi.mock("./llmTranslateBundle.js");
 import { llmTranslateBundles } from "./llmTranslateBundle.js";
 
 const emptyUsage = { promptTokens: 0, completionTokens: 0, cachedTokens: 0, thinkingTokens: 0, totalTokens: 0 };
+
+// ---------------------------------------------------------------------------
+// formatUsage
+// ---------------------------------------------------------------------------
+
+describe("formatUsage", () => {
+  it("returns just the total when all fields are zero", () => {
+    expect(formatUsage({ promptTokens: 0, completionTokens: 0, cachedTokens: 0, thinkingTokens: 0, totalTokens: 0 })).toBe("0 tokens");
+  });
+
+  it("shows only non-zero fields — prompt and completion", () => {
+    expect(formatUsage({ promptTokens: 120, completionTokens: 30, cachedTokens: 0, thinkingTokens: 0, totalTokens: 150 })).toBe("150 tokens (prompt: 120, completion: 30)");
+  });
+
+  it("shows cached when non-zero", () => {
+    expect(formatUsage({ promptTokens: 120, completionTokens: 30, cachedTokens: 10, thinkingTokens: 0, totalTokens: 150 })).toBe("150 tokens (prompt: 120, completion: 30, cached: 10)");
+  });
+
+  it("shows all four fields when all are non-zero", () => {
+    expect(formatUsage({ promptTokens: 100, completionTokens: 40, cachedTokens: 10, thinkingTokens: 5, totalTokens: 140 })).toBe("140 tokens (prompt: 100, completion: 40, cached: 10, thinking: 5)");
+  });
+
+  it("shows only thinking when it is the sole non-zero field", () => {
+    expect(formatUsage({ promptTokens: 0, completionTokens: 0, cachedTokens: 0, thinkingTokens: 5, totalTokens: 5 })).toBe("5 tokens (thinking: 5)");
+  });
+});
 
 async function makeProject(locales = ["en-gb", "nl"]) {
   return loadProjectInMemory({
