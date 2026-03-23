@@ -678,8 +678,8 @@ describe("llmTranslateBundles — usage accumulated across retries", () => {
   });
 });
 
-describe("llmTranslateBundles — bundle with missing source locale is skipped gracefully", () => {
-  it("skips a bundle whose source locale is absent and still processes others", async () => {
+describe("llmTranslateBundles — bundle with missing source locale returns error", () => {
+  it("returns error for a bundle whose source locale is absent and still translates others", async () => {
     const project = await makeProject(["en-gb", "nl"]);
     await insertSimpleBundle(project.db, "good", "Hello");
     const bundles = await selectBundleNested(project.db).execute();
@@ -703,8 +703,34 @@ describe("llmTranslateBundles — bundle with missing source locale is skipped g
       model: MODEL,
     });
 
-    // Both bundles returned; good one has data, no-source also has data (unchanged copy)
     expect(result.results).toHaveLength(2);
-    expect(result.results.every((r) => !r.error)).toBe(true);
+    // good bundle translated successfully
+    expect(result.results[0]!.error).toBeUndefined();
+    expect(result.results[0]!.data).toBeDefined();
+    // no-source bundle returns an error, not a silent success
+    expect(result.results[1]!.error).toMatch(/Source locale "en-gb" not found/);
+    expect(result.results[1]!.data).toBeUndefined();
+  });
+});
+
+describe("llmTranslateBundles — all bundles missing source locale (mistyped --locale)", () => {
+  it("returns errors for all bundles without making an API call", async () => {
+    const project = await makeProject(["en-gb", "nl"]);
+    await insertSimpleBundle(project.db, "a", "Hello");
+    await insertSimpleBundle(project.db, "b", "Save");
+    const bundles = await selectBundleNested(project.db).execute();
+
+    const result = await llmTranslateBundles({
+      bundles,
+      sourceLocale: "fr", // mistyped — not in any bundle
+      targetLocales: ["nl"],
+      openrouterApiKey: API_KEY,
+      model: MODEL,
+    });
+
+    expect(callOpenRouter).not.toHaveBeenCalled();
+    expect(result.results).toHaveLength(2);
+    expect(result.results[0]!.error).toMatch(/Source locale "fr" not found/);
+    expect(result.results[1]!.error).toMatch(/Source locale "fr" not found/);
   });
 });

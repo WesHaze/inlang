@@ -355,3 +355,43 @@ describe("llmTranslateCommandAction — batch-size chunking", () => {
     expect(vi.mocked(llmTranslateBundles).mock.calls[1]![0].bundles).toHaveLength(1);
   });
 });
+
+// ---------------------------------------------------------------------------
+// targetLocales normalization
+// ---------------------------------------------------------------------------
+
+describe("llmTranslateCommandAction — targetLocales normalization", () => {
+  it("trims whitespace and drops empty entries before dispatching", async () => {
+    const project = await makeProject();
+    await insertBundle(project.db, "greet");
+
+    vi.mocked(llmTranslateBundles).mockResolvedValue({ results: [makeMockResult("greet")], usage: emptyUsage });
+
+    await llmTranslateCommandAction({
+      project,
+      sourceLocale: "en-gb",
+      targetLocales: [" nl", "", " ", "nl"],
+      model: DEFAULT_MODEL,
+    });
+
+    const dispatched = vi.mocked(llmTranslateBundles).mock.calls[0]![0].targetLocales;
+    expect(dispatched).toEqual(["nl", "nl"]);
+  });
+
+  it("drops a trailing empty string produced by a trailing comma", async () => {
+    const project = await makeProject();
+    await insertBundle(project.db, "greet");
+
+    vi.mocked(llmTranslateBundles).mockResolvedValue({ results: [makeMockResult("greet")], usage: emptyUsage });
+
+    await llmTranslateCommandAction({
+      project,
+      sourceLocale: "en-gb",
+      targetLocales: ["nl", ""],
+      model: DEFAULT_MODEL,
+    });
+
+    const dispatched = vi.mocked(llmTranslateBundles).mock.calls[0]![0].targetLocales;
+    expect(dispatched).toEqual(["nl"]);
+  });
+});

@@ -397,3 +397,13 @@ packages/lix-docs/docs/.vitepress/dist
 artifact/*
 
 .claude/*
+
+# AI agent workspace files (Claude Code, Codex, OpenCode, etc.)
+.agents/
+.codex/
+.opencode/
+opencode.json
+AGENTS.md
+.github/agents/
+.github/prompts/
+.github/skills/

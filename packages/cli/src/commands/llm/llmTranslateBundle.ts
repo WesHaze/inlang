@@ -262,11 +262,15 @@ export async function llmTranslateBundles(
   // Build work map: `${bundleId}::${variantId}` → work item
   type WorkItem = { copyIdx: number; sourceVariant: NewVariant; targetLocales: string[] };
   const workMap = new Map<string, WorkItem>();
+  const bundleErrors = new Map<number, string>(); // copyIdx → error message
 
   for (let i = 0; i < copies.length; i++) {
     const copy = copies[i]!;
     const sourceMessage = copy.messages.find((m) => m.locale === args.sourceLocale);
-    if (!sourceMessage) continue;
+    if (!sourceMessage) {
+      bundleErrors.set(i, `Source locale "${args.sourceLocale}" not found in bundle "${copy.id}"`);
+      continue;
+    }
 
     for (const sourceVariant of sourceMessage.variants) {
       const targetLocales: string[] = [];
@@ -289,7 +293,12 @@ export async function llmTranslateBundles(
   }
 
   if (workMap.size === 0) {
-    return { results: copies.map((data) => ({ data })), usage: emptyUsage() };
+    return {
+      results: copies.map((data, i) =>
+        bundleErrors.has(i) ? { error: bundleErrors.get(i) } : { data },
+      ),
+      usage: emptyUsage(),
+    };
   }
 
   const keyEntries: Record<string, { src: Pattern; targetLocales: string[] }> = {};
@@ -411,7 +420,12 @@ export async function llmTranslateBundles(
     }
   }
 
-  return { results: copies.map((data) => ({ data })), usage: accumulatedUsage };
+  return {
+    results: copies.map((data, i) =>
+      bundleErrors.has(i) ? { error: bundleErrors.get(i) } : { data },
+    ),
+    usage: accumulatedUsage,
+  };
 }
 
 function sleep(ms: number): Promise<void> {

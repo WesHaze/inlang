@@ -105,7 +105,6 @@ export async function llmTranslateCommandAction(
   const {
     project,
     sourceLocale,
-    targetLocales,
     model,
     context,
     batchSize = 200,
@@ -114,6 +113,7 @@ export async function llmTranslateCommandAction(
     quiet = false,
   } = args;
 
+  const targetLocales = args.targetLocales.map((s) => s.trim()).filter(Boolean);
   const apiKey = args.apiKey ?? process.env.OPENROUTER_API_KEY;
   if (!dryRun && !apiKey) {
     throw new Error("OPENROUTER_API_KEY is required unless --dry-run is used.");
