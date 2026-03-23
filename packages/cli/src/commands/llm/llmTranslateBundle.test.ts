@@ -77,13 +77,15 @@ runIf("llmTranslateBundle (integration)", () => {
     const allFixtures = generateFixtureKeys();
     // Pick one from each category in the fixture set
     const sample = [
-      allFixtures.find((k) => k.id?.startsWith("simple"))!,       // plain text
-      allFixtures.find((k) => k.id?.startsWith("single_var"))!,   // single variable
-      allFixtures.find((k) => k.id?.startsWith("multi_var"))!,    // multi-variable
-      allFixtures.find((k) => k.id?.startsWith("markup"))!,       // markup nodes
-      allFixtures.find((k) => k.id?.startsWith("long"))!,         // long string
-      allFixtures.find((k) => k.id?.startsWith("edge_var_start"))!, // edge: var at start
-      allFixtures.find((k) => k.id?.startsWith("edge_markup_var"))!, // edge: markup + var
+      allFixtures.find((k) => k.id?.startsWith("simple"))!,           // plain text
+      allFixtures.find((k) => k.id?.startsWith("single_var"))!,       // single variable
+      allFixtures.find((k) => k.id?.startsWith("multi_var"))!,        // multi-variable
+      allFixtures.find((k) => k.id?.startsWith("markup"))!,           // markup nodes
+      allFixtures.find((k) => k.id?.startsWith("long"))!,             // long string
+      allFixtures.find((k) => k.id?.startsWith("edge_var_start"))!,   // edge: var at start
+      allFixtures.find((k) => k.id?.startsWith("edge_markup_var"))!,  // edge: markup + var
+      allFixtures.find((k) => k.id?.startsWith("emoji_before_var"))!, // emoji before variable
+      allFixtures.find((k) => k.id?.startsWith("emoji_after_var"))!,  // emoji after variable
     ];
 
     const project = await loadProjectInMemory({
@@ -121,6 +123,88 @@ runIf("llmTranslateBundle (integration)", () => {
         }
       }),
     );
+  }, 60_000);
+
+  it("EDGE: preserves emoji in text nodes adjacent to expression nodes", async () => {
+    const project = await loadProjectInMemory({
+      blob: await newProject({
+        settings: { baseLocale: "en", locales: ["en", "de", "fr"] },
+      }),
+    });
+
+    // Three emoji-placement shapes: emoji before var, emoji after var, emoji sandwiching var
+    const emojiCases = [
+      {
+        id: "emoji_before_var",
+        pattern: [
+          { type: "text" as const, value: "🎉 " },
+          { type: "expression" as const, arg: { type: "variable-reference" as const, name: "name" } },
+          { type: "text" as const, value: " joined the team!" },
+        ],
+      },
+      {
+        id: "emoji_after_var",
+        pattern: [
+          { type: "text" as const, value: "You have " },
+          { type: "expression" as const, arg: { type: "variable-reference" as const, name: "count" } },
+          { type: "text" as const, value: " new messages ✉️" },
+        ],
+      },
+      {
+        id: "emoji_sandwich_var",
+        pattern: [
+          { type: "text" as const, value: "🔥 " },
+          { type: "expression" as const, arg: { type: "variable-reference" as const, name: "name" } },
+          { type: "text" as const, value: " 🚀" },
+        ],
+      },
+    ];
+
+    for (const { id, pattern } of emojiCases) {
+      await insertBundleNested(project.db, {
+        id,
+        messages: [{ id: `${id}_msg`, bundleId: id, locale: "en", variants: [{ id: `${id}_var`, messageId: `${id}_msg`, pattern }] }],
+      });
+    }
+
+    const bundles = await selectBundleNested(project.db).execute();
+    const extractEmoji = (s: string) =>
+      [...s.matchAll(/\p{Extended_Pictographic}/gu)].map((m) => m[0]!);
+
+    for (const bundle of bundles) {
+      const result = await llmTranslateBundle({
+        bundle,
+        sourceLocale: "en",
+        targetLocales: ["de", "fr"],
+        client: integrationClient,
+        model: DEFAULT_MODEL,
+      });
+      expect(result.error, `${bundle.id}: unexpected error`).toBeUndefined();
+
+      const srcPattern = bundle.messages.find((m) => m.locale === "en")!.variants[0]!.pattern ?? [];
+      for (const locale of ["de", "fr"]) {
+        const msg = result.data!.messages.find((m: NewMessageNested) => m.locale === locale);
+        const tgtPattern = (msg!.variants[0] as NewVariant | undefined)?.pattern ?? [];
+        expect(tgtPattern, `${bundle.id}/${locale}: node count changed`).toHaveLength(srcPattern.length);
+
+        srcPattern.forEach((srcNode, i) => {
+          const tgtNode = tgtPattern[i]!;
+          if (srcNode.type === "expression") {
+            expect(tgtNode, `${bundle.id}/${locale}[${i}]: expression node mutated`).toEqual(srcNode);
+          }
+          if (srcNode.type === "text" && "value" in srcNode) {
+            const srcEmoji = extractEmoji(srcNode.value);
+            if (srcEmoji.length > 0) {
+              expect(tgtNode.type, `${bundle.id}/${locale}[${i}]: text node type changed`).toBe("text");
+              const tgtValue = "value" in tgtNode ? String(tgtNode.value) : "";
+              for (const emoji of srcEmoji) {
+                expect(tgtValue, `${bundle.id}/${locale}[${i}]: emoji '${emoji}' was dropped`).toContain(emoji);
+              }
+            }
+          }
+        });
+      }
+    }
   }, 60_000);
 
   it("EDGE: preserves expression nodes (variables) in translated pattern", async () => {

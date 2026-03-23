@@ -377,5 +377,48 @@ export function generateFixtureKeys(): NewBundleNested[] {
     );
   }
 
+  // ── Emoji adjacent to variables (30) ─────────────────────────────────────
+  // These test that emoji in text nodes survive LLM translation unchanged.
+  // LLMs may drop, replace, or move emoji — especially when they sit directly
+  // next to a variable placeholder.
+
+  // Emoji before variable
+  const emojiBeforeTemplates: Array<[string, string, string]> = [
+    ["🎉 ", "name", " joined the team!"],
+    ["🔔 ", "count", " new notifications"],
+    ["📁 ", "filename", " was uploaded successfully."],
+    ["🚨 ", "error", " — please try again."],
+    ["👤 ", "username", " is now online."],
+  ];
+  for (let i = 0; i < 15; i++) {
+    const [before, varName, after] = emojiBeforeTemplates[i % emojiBeforeTemplates.length]!;
+    keys.push(
+      bundle(id("emoji_before_var"), [
+        { type: "text", value: before },
+        { type: "expression", arg: { type: "variable-reference", name: varName } },
+        { type: "text", value: after },
+      ]),
+    );
+  }
+
+  // Emoji after variable
+  const emojiAfterTemplates: Array<[string, string, string]> = [
+    ["You have ", "count", " unread messages ✉️"],
+    ["Uploading ", "filename", " ⏳"],
+    ["Welcome back, ", "name", " 👋"],
+    ["Deleted ", "count", " items 🗑️"],
+    ["Synced with ", "device", " ✅"],
+  ];
+  for (let i = 0; i < 15; i++) {
+    const [before, varName, after] = emojiAfterTemplates[i % emojiAfterTemplates.length]!;
+    keys.push(
+      bundle(id("emoji_after_var"), [
+        { type: "text", value: before },
+        { type: "expression", arg: { type: "variable-reference", name: varName } },
+        { type: "text", value: after },
+      ]),
+    );
+  }
+
   return keys;
 }
