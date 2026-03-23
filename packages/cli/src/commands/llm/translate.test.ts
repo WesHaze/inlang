@@ -18,7 +18,7 @@ test.runIf(process.env[OPENROUTER_API_KEY_ENV])(
       }),
     });
 
-    // Use first 20 fixture keys — covers simple, variable, and multi-variable patterns
+    // Use first 20 fixture keys — these are all simple text patterns (variable/multi-variable fixtures start later in the set)
     const fixtureKeys = generateFixtureKeys().slice(0, 20);
     await Promise.all(fixtureKeys.map((key) => insertBundleNested(project.db, key)));
 
