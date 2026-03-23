@@ -35,7 +35,7 @@ export const translate = new Command()
       if (isNaN(n) || n < 1) throw new Error(`--batch-size must be a positive integer, got: "${v}"`);
       return n;
     },
-    200,
+    10,
   )
   .option("--force", "Overwrite existing translations.", false)
   .option("--dry-run", "Preview what would be translated without writing.", false)
@@ -108,7 +108,7 @@ export async function llmTranslateCommandAction(
     sourceLocale,
     model,
     context,
-    batchSize = 200,
+    batchSize = 10,
     force = false,
     dryRun = false,
     quiet = false,
