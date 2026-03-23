@@ -98,19 +98,41 @@ describe("parseMessage", () => {
             },
           },
         },
+        {
+          type: "local-variable",
+          name: "countPluralOffset1Exact",
+          value: {
+            type: "expression",
+            arg: { type: "variable-reference", name: "count" },
+          },
+        },
       ] satisfies Declaration[]),
     );
 
     expect(parsed.selectors).toEqual([
+      { type: "variable-reference", name: "countPluralOffset1Exact" },
       { type: "variable-reference", name: "countPluralOffset1" },
     ]);
 
     const matches = parsed.variants.map((variant) => variant.matches ?? []);
     expect(matches).toEqual(
       expect.arrayContaining([
-        [{ type: "literal-match", key: "countPluralOffset1", value: "0" }],
-        [{ type: "literal-match", key: "countPluralOffset1", value: "one" }],
-        [{ type: "catchall-match", key: "countPluralOffset1" }],
+        [
+          {
+            type: "literal-match",
+            key: "countPluralOffset1Exact",
+            value: "0",
+          },
+          { type: "catchall-match", key: "countPluralOffset1" },
+        ],
+        [
+          { type: "catchall-match", key: "countPluralOffset1Exact" },
+          { type: "literal-match", key: "countPluralOffset1", value: "one" },
+        ],
+        [
+          { type: "catchall-match", key: "countPluralOffset1Exact" },
+          { type: "catchall-match", key: "countPluralOffset1" },
+        ],
       ]),
     );
 
@@ -162,6 +184,34 @@ describe("parseMessage", () => {
         },
       ] satisfies Declaration[]),
     );
+  });
+
+  it("orders exact plural cases before category and other cases", () => {
+    const parsed = parseMessage({
+      ...baseArgs,
+      messageSource:
+        "{item, plural, one {one item} other {other items} =0 {no items}}",
+    });
+
+    expect(parsed.selectors).toEqual([
+      { type: "variable-reference", name: "itemPluralExact" },
+      { type: "variable-reference", name: "itemPlural" },
+    ]);
+
+    expect(parsed.variants.map((variant) => variant.matches ?? [])).toEqual([
+      [
+        { type: "literal-match", key: "itemPluralExact", value: "0" },
+        { type: "catchall-match", key: "itemPlural" },
+      ],
+      [
+        { type: "catchall-match", key: "itemPluralExact" },
+        { type: "literal-match", key: "itemPlural", value: "one" },
+      ],
+      [
+        { type: "catchall-match", key: "itemPluralExact" },
+        { type: "catchall-match", key: "itemPlural" },
+      ],
+    ]);
   });
 
   it("avoids local variable name collisions with input variables", () => {

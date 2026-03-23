@@ -33,6 +33,7 @@ type TokenList = Token[];
 
 type PluralSelector = {
   selectorName: string;
+  exactSelectorName?: string;
   arg: string;
   type: "plural" | "selectordinal";
   offset?: number;
@@ -149,6 +150,9 @@ function expandTokens(
       case "plural":
       case "selectordinal": {
         ensureInputVariable(context, token.arg);
+        const hasExactCases =
+          token.type !== "select" &&
+          token.cases.some((selectCase) => isExactPluralCaseKey(selectCase.key));
         const selectorName =
           token.type === "select"
             ? token.arg
@@ -156,17 +160,36 @@ function expandTokens(
                 arg: token.arg,
                 type: token.type,
                 offset: token.pluralOffset,
-              });
+                withExactSelector: hasExactCases,
+              }).selectorName;
+        const pluralSelector =
+          token.type === "select"
+            ? undefined
+            : context.pluralSelectors.get(
+                `${token.arg}|${token.type}|${token.pluralOffset ?? 0}`,
+              );
+        if (
+          hasExactCases &&
+          pluralSelector?.exactSelectorName &&
+          !context.selectors.includes(pluralSelector.exactSelectorName)
+        ) {
+          context.selectors.push(pluralSelector.exactSelectorName);
+        }
         if (!context.selectors.includes(selectorName)) {
           context.selectors.push(selectorName);
         }
 
         const nextBranches: Branch[] = [];
-        for (const selectCase of token.cases) {
-          const match = matchForCase(selectorName, selectCase.key, token.type);
+        for (const selectCase of sortSelectCases(token.cases, token.type)) {
+          const matches = matchesForCase(
+            selectorName,
+            selectCase.key,
+            token.type,
+            pluralSelector,
+          );
           for (const current of branches) {
-            const branchMatches = match
-              ? [...current.matches, match]
+            const branchMatches = matches
+              ? [...current.matches, ...matches]
               : current.matches;
             const newBranch = cloneBranch({
               pattern: current.pattern,
@@ -205,11 +228,24 @@ function ensureInputVariable(context: ParseContext, name: string) {
 
 function ensurePluralSelector(
   context: ParseContext,
-  args: { arg: string; type: "plural" | "selectordinal"; offset?: number },
-): string {
+  args: {
+    arg: string;
+    type: "plural" | "selectordinal";
+    offset?: number;
+    withExactSelector: boolean;
+  },
+): PluralSelector {
   const key = `${args.arg}|${args.type}|${args.offset ?? 0}`;
   const existing = context.pluralSelectors.get(key);
-  if (existing) return existing.selectorName;
+  if (existing) {
+    if (args.withExactSelector && !existing.exactSelectorName) {
+      existing.exactSelectorName = createExactSelector(context, {
+        arg: args.arg,
+        selectorName: existing.selectorName,
+      });
+    }
+    return existing;
+  }
 
   const baseName =
     args.type === "selectordinal"
@@ -254,42 +290,121 @@ function ensurePluralSelector(
   };
 
   context.localVariables.set(selectorName, localVariable);
-  context.pluralSelectors.set(key, {
+  const pluralSelector = {
     selectorName,
     arg: args.arg,
     type: args.type,
     offset: args.offset,
-  });
+    exactSelectorName: args.withExactSelector
+      ? createExactSelector(context, {
+          arg: args.arg,
+          selectorName,
+        })
+      : undefined,
+  } satisfies PluralSelector;
+  context.pluralSelectors.set(key, pluralSelector);
 
-  return selectorName;
+  return pluralSelector;
 }
 
-function matchForCase(
+function createExactSelector(
+  context: ParseContext,
+  args: { arg: string; selectorName: string },
+): string {
+  const baseName = `${args.selectorName}Exact`;
+  let exactSelectorName = baseName;
+  let suffix = 1;
+  while (
+    context.localVariables.has(exactSelectorName) ||
+    context.inputVariables.has(exactSelectorName)
+  ) {
+    exactSelectorName = `${baseName}${suffix}`;
+    suffix += 1;
+  }
+
+  context.localVariables.set(exactSelectorName, {
+    type: "local-variable",
+    name: exactSelectorName,
+    value: {
+      type: "expression",
+      arg: { type: "variable-reference", name: args.arg },
+    },
+  });
+
+  return exactSelectorName;
+}
+
+function matchesForCase(
   selectorName: string,
   key: string,
   selectorType: "select" | "plural" | "selectordinal",
-): Match | undefined {
-  if (key === "other") {
-    return {
-      type: "catchall-match",
-      key: selectorName,
-    };
+  pluralSelector?: PluralSelector,
+): Match[] | undefined {
+  if (
+    selectorType !== "select" &&
+    pluralSelector?.exactSelectorName !== undefined
+  ) {
+    if (key === "other") {
+      return [
+        { type: "catchall-match", key: pluralSelector.exactSelectorName },
+        { type: "catchall-match", key: selectorName },
+      ];
+    }
+
+    if (isExactPluralCaseKey(key)) {
+      return [
+        {
+          type: "literal-match",
+          key: pluralSelector.exactSelectorName,
+          value: key.slice(1),
+        },
+        { type: "catchall-match", key: selectorName },
+      ];
+    }
+
+    return [
+      { type: "catchall-match", key: pluralSelector.exactSelectorName },
+      { type: "literal-match", key: selectorName, value: key },
+    ];
   }
 
-  const normalizedKey =
-    selectorType !== "select" && isExactPluralCaseKey(key)
-      ? key.slice(1)
-      : key;
+  if (key === "other") {
+    return [{ type: "catchall-match", key: selectorName }];
+  }
 
-  return {
-    type: "literal-match",
-    key: selectorName,
-    value: normalizedKey,
-  };
+  return [{ type: "literal-match", key: selectorName, value: key }];
 }
 
 function isExactPluralCaseKey(key: string): boolean {
   return /^=-?(?:0|[1-9]\d*)(?:\.\d+)?$/.test(key);
+}
+
+function sortSelectCases(
+  cases: Select["cases"],
+  selectorType: "select" | "plural" | "selectordinal",
+): Select["cases"] {
+  if (selectorType === "select") {
+    return cases;
+  }
+
+  return [...cases]
+    .map((selectCase, index) => ({ selectCase, index }))
+    .sort((left, right) => {
+      const priorityDiff =
+        selectCasePriority(left.selectCase.key) -
+        selectCasePriority(right.selectCase.key);
+      if (priorityDiff !== 0) {
+        return priorityDiff;
+      }
+      return left.index - right.index;
+    })
+    .map((entry) => entry.selectCase);
+}
+
+function selectCasePriority(key: string): number {
+  if (isExactPluralCaseKey(key)) return 0;
+  if (key === "other") return 2;
+  return 1;
 }
 
 function functionAnnotation(
