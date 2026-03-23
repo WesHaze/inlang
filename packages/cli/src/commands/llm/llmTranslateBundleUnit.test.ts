@@ -795,3 +795,35 @@ describe("llmTranslateBundles — all bundles missing source locale (mistyped --
     expect(result.results[1]!.error).toMatch(/Source locale "fr" not found/);
   });
 });
+
+// ---------------------------------------------------------------------------
+// llmTranslateBundles — bare-array single-locale fallback
+// ---------------------------------------------------------------------------
+
+describe("llmTranslateBundles — bare-array single-locale fallback", () => {
+  it("succeeds when LLM returns a bare array instead of {key:{locale:[...]}} for a single target locale", async () => {
+    const project = await makeProject(["en-gb", "nl"]);
+    await insertSimpleBundle(project.db, "greet", "hello");
+    const bundles = await selectBundleNested(project.db).execute();
+    const variantId = bundles[0]!.messages[0]!.variants[0]!.id;
+    const key = `greet::${variantId}`;
+
+    // LLM returns { key: [...] } — bare array as the value instead of { key: { nl: [...] } }
+    mockComplete.mockResolvedValueOnce(
+      mockOk(JSON.stringify({ [key]: [{ type: "text", value: "hallo" }] })),
+    );
+
+    const result = await llmTranslateBundles({
+      bundles,
+      sourceLocale: "en-gb",
+      targetLocales: ["nl"],
+      client: mockClient,
+      model: MODEL,
+    });
+
+    expect(result.results[0]!.error).toBeUndefined();
+    expect(result.results[0]!.translated).toBe(true);
+    const nl = result.results[0]!.data!.messages.find((m: NewMessageNested) => m.locale === "nl");
+    expect(nl?.variants[0]?.pattern).toEqual([{ type: "text", value: "hallo" }]);
+  });
+});
