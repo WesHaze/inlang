@@ -214,18 +214,24 @@ export async function llmTranslateCommandAction(
         }
       }
       if (!quiet) {
-        log.info(`  [batch ${chunkIdx + 1}/${chunks.length}] ${usage.totalTokens} tokens`);
+        log.info(`  [batch ${chunkIdx + 1}/${chunks.length}] ${formatUsage(usage)}`);
       }
-      return { tokens: usage.totalTokens, successCount: chunkSuccess, errorCount: chunkErrors };
+      return { usage, successCount: chunkSuccess, errorCount: chunkErrors };
     }),
   );
 
-  const totalTokens = chunkResults.reduce((sum, r) => sum + r.tokens, 0);
+  const totalUsage: OpenRouterUsage = {
+    promptTokens:     chunkResults.reduce((sum, r) => sum + r.usage.promptTokens, 0),
+    completionTokens: chunkResults.reduce((sum, r) => sum + r.usage.completionTokens, 0),
+    cachedTokens:     chunkResults.reduce((sum, r) => sum + r.usage.cachedTokens, 0),
+    thinkingTokens:   chunkResults.reduce((sum, r) => sum + r.usage.thinkingTokens, 0),
+    totalTokens:      chunkResults.reduce((sum, r) => sum + r.usage.totalTokens, 0),
+  };
   const successCount = chunkResults.reduce((sum, r) => sum + r.successCount, 0);
   const errorCount = chunkResults.reduce((sum, r) => sum + r.errorCount, 0);
 
   log.success(
-    `LLM translate complete. ${successCount} bundle(s) translated, ${errorCount} error(s). Total tokens used: ${totalTokens}.`,
+    `LLM translate complete. ${successCount} bundle(s) translated, ${errorCount} error(s). ${formatUsage(totalUsage)} used.`,
   );
 
   return { successCount, errorCount };

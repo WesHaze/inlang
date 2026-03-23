@@ -10,6 +10,7 @@ import {
 } from "@inlang/sdk";
 import { llmTranslateCommandAction, DEFAULT_MODEL, formatUsage } from "./translate.js";
 import { OpenRouterClient, OPENROUTER_API_KEY_ENV } from "./openrouterClient.js";
+import { log } from "../../utilities/log.js";
 
 vi.mock("./llmTranslateBundle.js");
 import { llmTranslateBundles } from "./llmTranslateBundle.js";
@@ -494,5 +495,41 @@ describe("llmTranslateCommandAction — result aggregation", () => {
 
     expect(result.successCount).toBe(2);
     expect(result.errorCount).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// token usage reporting in log output
+// ---------------------------------------------------------------------------
+
+describe("llmTranslateCommandAction — token usage in log output", () => {
+  it("includes per-field breakdown in per-batch log.info and final log.success when fields are non-zero", async () => {
+    const infoSpy = vi.spyOn(log, "info");
+    const successSpy = vi.spyOn(log, "success");
+
+    const project = await makeProject();
+    await insertBundle(project.db, "greet");
+
+    const nonZeroUsage = { promptTokens: 80, completionTokens: 20, cachedTokens: 0, thinkingTokens: 0, totalTokens: 100 };
+    vi.mocked(llmTranslateBundles).mockResolvedValue({
+      results: [{ ...makeMockResult("greet"), translated: true }],
+      usage: nonZeroUsage,
+    });
+
+    await llmTranslateCommandAction({
+      project,
+      sourceLocale: "en-gb",
+      targetLocales: ["nl"],
+      model: DEFAULT_MODEL,
+      apiKey: "test-key",
+    });
+
+    const infoCall = infoSpy.mock.calls.find((c) => String(c[0]).includes("batch"));
+    expect(infoCall).toBeDefined();
+    expect(String(infoCall![0])).toContain("100 tokens (prompt: 80, completion: 20)");
+
+    const successCall = successSpy.mock.calls[0];
+    expect(successCall).toBeDefined();
+    expect(String(successCall![0])).toContain("100 tokens (prompt: 80, completion: 20) used.");
   });
 });
