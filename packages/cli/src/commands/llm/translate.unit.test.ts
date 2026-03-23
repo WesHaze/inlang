@@ -9,6 +9,7 @@ import {
   newProject,
 } from "@inlang/sdk";
 import { llmTranslateCommandAction, DEFAULT_MODEL } from "./translate.js";
+import { OpenRouterClient, OPENROUTER_API_KEY_ENV } from "./openrouterClient.js";
 
 vi.mock("./llmTranslateBundle.js");
 import { llmTranslateBundles } from "./llmTranslateBundle.js";
@@ -295,7 +296,7 @@ describe("llmTranslateCommandAction — missing API key", () => {
 // ---------------------------------------------------------------------------
 
 describe("llmTranslateCommandAction — api-key forwarded", () => {
-  it("passes apiKey arg to llmTranslateBundles as openrouterApiKey", async () => {
+  it("passes apiKey arg to llmTranslateBundles as client.apiKey", async () => {
     const project = await makeProject();
     await insertBundle(project.db, "greet");
     vi.mocked(llmTranslateBundles).mockResolvedValue({ results: [makeMockResult("greet")], usage: emptyUsage });
@@ -308,7 +309,7 @@ describe("llmTranslateCommandAction — api-key forwarded", () => {
       apiKey: "my-explicit-key",
     });
 
-    expect(vi.mocked(llmTranslateBundles).mock.calls[0]![0].openrouterApiKey).toBe("my-explicit-key");
+    expect((vi.mocked(llmTranslateBundles).mock.calls[0]![0].client as OpenRouterClient).apiKey).toBe("my-explicit-key");
   });
 
   it("apiKey arg takes precedence over INLANG_OPENROUTER_API_KEY env var", async () => {
@@ -330,7 +331,33 @@ describe("llmTranslateCommandAction — api-key forwarded", () => {
       process.env.INLANG_OPENROUTER_API_KEY = savedKey;
     }
 
-    expect(vi.mocked(llmTranslateBundles).mock.calls[0]![0].openrouterApiKey).toBe("arg-key");
+    expect((vi.mocked(llmTranslateBundles).mock.calls[0]![0].client as OpenRouterClient).apiKey).toBe("arg-key");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// client construction
+// ---------------------------------------------------------------------------
+
+describe("llmTranslateCommandAction — client construction", () => {
+  it("passes an OpenRouterClient instance to llmTranslateBundles", async () => {
+    const project = await makeProject();
+    await insertBundle(project.db, "greet");
+    vi.mocked(llmTranslateBundles).mockResolvedValue({
+      results: [makeMockResult("greet")],
+      usage: emptyUsage,
+    });
+
+    await llmTranslateCommandAction({
+      project,
+      sourceLocale: "en-gb",
+      targetLocales: ["nl"],
+      model: DEFAULT_MODEL,
+      apiKey: "test-key",
+    });
+
+    const passedClient = vi.mocked(llmTranslateBundles).mock.calls[0]![0].client;
+    expect(passedClient).toBeInstanceOf(OpenRouterClient);
   });
 });
 

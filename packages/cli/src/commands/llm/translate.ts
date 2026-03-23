@@ -10,7 +10,12 @@ import { projectOption } from "../../utilities/globalFlags.js";
 import { getInlangProject } from "../../utilities/getInlangProject.js";
 import { log, logError } from "../../utilities/log.js";
 import { llmTranslateBundles } from "./llmTranslateBundle.js";
-import { OPENROUTER_API_KEY_ENV } from "./openrouterClient.js";
+import {
+  OpenRouterClient,
+  OPENROUTER_API_KEY_ENV,
+  OPENROUTER_SITE_URL_ENV,
+  OPENROUTER_SITE_NAME_ENV,
+} from "./openrouterClient.js";
 
 export const DEFAULT_MODEL = "openai/gpt-5-mini";
 
@@ -157,6 +162,12 @@ export async function llmTranslateCommandAction(
     throw new Error(`${OPENROUTER_API_KEY_ENV} is required unless --dry-run is used.`);
   }
 
+  const client = new OpenRouterClient({
+    apiKey,
+    siteUrl: process.env[OPENROUTER_SITE_URL_ENV],
+    siteName: process.env[OPENROUTER_SITE_NAME_ENV],
+  });
+
   const chunks: typeof bundles[] = [];
   for (let i = 0; i < bundles.length; i += batchSize) {
     chunks.push(bundles.slice(i, i + batchSize));
@@ -168,7 +179,7 @@ export async function llmTranslateCommandAction(
 
   await Promise.all(
     chunks.map(async (chunk, chunkIdx) => {
-      const { results, usage } = await llmTranslateBundles({ bundles: chunk, sourceLocale, targetLocales, model, openrouterApiKey: apiKey, context, force, quiet });
+      const { results, usage } = await llmTranslateBundles({ bundles: chunk, sourceLocale, targetLocales, model, client, context, force, quiet });
       totalTokens += usage.totalTokens;
       for (let i = 0; i < results.length; i++) {
         const result = results[i]!;
