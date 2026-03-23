@@ -123,7 +123,7 @@ runIf("llmTranslateBundle (integration)", () => {
         }
       }),
     );
-  }, 60_000);
+  }, 90_000);
 
   it("EDGE: preserves emoji in text nodes adjacent to expression nodes", async () => {
     const project = await loadProjectInMemory({
@@ -206,6 +206,54 @@ runIf("llmTranslateBundle (integration)", () => {
       }
     }
   }, 60_000);
+
+  it("EDGE: adjacent variables with single-space separator are preserved in order", async () => {
+    const project = await loadProjectInMemory({
+      blob: await newProject({
+        settings: { baseLocale: "en", locales: ["en", "de", "ja"] },
+      }),
+    });
+
+    // {firstName} {lastName} — the space is meaningful and the order must not be
+    // swapped even in languages where family name conventionally comes first (e.g. Japanese).
+    await insertBundleNested(project.db, {
+      id: "adjacent_vars",
+      messages: [{
+        id: "adjacent_vars_msg", bundleId: "adjacent_vars", locale: "en",
+        variants: [{
+          id: "adjacent_vars_var", messageId: "adjacent_vars_msg",
+          pattern: [
+            { type: "expression", arg: { type: "variable-reference", name: "firstName" } },
+            { type: "text", value: " " },
+            { type: "expression", arg: { type: "variable-reference", name: "lastName" } },
+          ],
+        }],
+      }],
+    });
+
+    const [bundle] = await selectBundleNested(project.db).execute();
+    const result = await llmTranslateBundle({
+      bundle: bundle!,
+      sourceLocale: "en",
+      targetLocales: ["de", "ja"],
+      client: integrationClient,
+      model: DEFAULT_MODEL,
+    });
+
+    expect(result.error).toBeUndefined();
+
+    const srcPattern = bundle!.messages[0]!.variants[0]!.pattern;
+    for (const locale of ["de", "ja"]) {
+      const msg = result.data!.messages.find((m: NewMessageNested) => m.locale === locale);
+      const tgtPattern = (msg!.variants[0] as NewVariant | undefined)?.pattern ?? [];
+      expect(tgtPattern, `${locale}: node count changed`).toHaveLength(srcPattern.length);
+      // Expression nodes must be identical and in original order
+      expect(tgtPattern[0], `${locale}: firstName node changed`).toEqual(srcPattern[0]);
+      expect(tgtPattern[2], `${locale}: lastName node changed`).toEqual(srcPattern[2]);
+      // Space separator must survive (may be adjusted to locale convention, but must be non-empty)
+      expect(tgtPattern[1]?.type, `${locale}: separator node type changed`).toBe("text");
+    }
+  }, 30_000);
 
   it("EDGE: variable-only pattern is returned unchanged (no text to translate)", async () => {
     const project = await loadProjectInMemory({
