@@ -6,8 +6,15 @@
  * 2. Strip markdown fences (```json or ```)
  * 3. Extract the first JSON object or array substring (discards preamble/postamble)
  * 4. Remove trailing commas
- * 5. Replace single quotes with double quotes (best-effort)
- * 6. JSON.parse
+ * 5+6. Try JSON.parse as-is; if it fails, apply a best-effort single-quote →
+ *      double-quote substitution and try once more.
+ *
+ * **Known limitation of the fallback (step 5+6):** the single-quote substitution
+ * is a global replace. It correctly handles LLM output that uses single-quoted
+ * keys/values (e.g. `{'fr': ['hello']}`), but will corrupt apostrophes inside
+ * values that are themselves single-quoted (e.g. `{'fr': "it's fine"}` becomes
+ * `{"fr": "it"s fine"}`). This only affects the fallback path — valid JSON
+ * (double-quoted) always takes the fast path and is never modified.
  *
  * Throws if the content cannot be salvaged.
  */

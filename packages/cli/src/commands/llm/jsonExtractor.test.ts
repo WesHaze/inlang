@@ -60,4 +60,13 @@ describe("extractJson", () => {
       fr: ["it's fine", "don't stop"],
     });
   });
+
+  // Known limitation: the single-quote fallback is a global replace. When the
+  // outer delimiters are single quotes AND a value contains an apostrophe, the
+  // fallback corrupts the value. This test documents the known failure mode.
+  it("fallback corrupts apostrophes inside single-quoted values (known limitation)", () => {
+    // {'fr': "it's done"} — first parse fails (single-quoted key), fallback
+    // applies global replace producing {"fr": "it"s done"} which also fails.
+    expect(() => extractJson("{'fr': \"it's done\"}")).toThrow();
+  });
 });
