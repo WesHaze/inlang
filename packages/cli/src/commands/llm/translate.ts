@@ -17,7 +17,7 @@ import {
   OPENROUTER_SITE_NAME_ENV,
 } from "./openrouterClient.js";
 
-export const DEFAULT_MODEL = "openai/gpt-5-mini";
+export const DEFAULT_MODEL = "openai/gpt-4o-mini";
 
 export const translate = new Command()
   .command("translate")
