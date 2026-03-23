@@ -223,6 +223,8 @@
 
   ```typescript
   export class OpenRouterClient {
+    /** Exposed for testing (verify which key was used to construct the client). */
+    readonly apiKey: string;
     private readonly client: OpenAI;
 
     constructor(args: {
@@ -230,6 +232,7 @@
       siteUrl?: string;
       siteName?: string;
     }) {
+      this.apiKey = args.apiKey;
       const defaultHeaders: Record<string, string> = {};
       if (args.siteUrl) defaultHeaders["HTTP-Referer"] = args.siteUrl;
       if (args.siteName) defaultHeaders["X-Title"] = args.siteName;
@@ -497,17 +500,19 @@
   import { OpenRouterClient, OPENROUTER_API_KEY_ENV } from "./openrouterClient.js";
   ```
 
-  **Update the `"api-key forwarded"` describe block** (around lines 297-335). It has two tests that currently assert `openrouterApiKey` on the `llmTranslateBundles` call args. After Task 4's `translate.ts` change, that field no longer exists. Update both assertions:
+  **Update the `"api-key forwarded"` describe block** (around lines 297-335). It has two tests that currently assert `openrouterApiKey`. After Task 4's `translate.ts` change, that field no longer exists. Replace both assertions using `client.apiKey` (the `readonly apiKey` property added to `OpenRouterClient` in Task 2):
   ```typescript
-  // Replace (two occurrences in the file):
+  // First test — replace:
   expect(vi.mocked(llmTranslateBundles).mock.calls[0]![0].openrouterApiKey).toBe("my-explicit-key");
-  // and:
-  expect(vi.mocked(llmTranslateBundles).mock.calls[0]![0].openrouterApiKey).toBe("arg-key");
+  // With:
+  expect((vi.mocked(llmTranslateBundles).mock.calls[0]![0].client as OpenRouterClient).apiKey).toBe("my-explicit-key");
 
-  // With (for both tests):
-  expect(vi.mocked(llmTranslateBundles).mock.calls[0]![0].client).toBeInstanceOf(OpenRouterClient);
+  // Second test — replace:
+  expect(vi.mocked(llmTranslateBundles).mock.calls[0]![0].openrouterApiKey).toBe("arg-key");
+  // With:
+  expect((vi.mocked(llmTranslateBundles).mock.calls[0]![0].client as OpenRouterClient).apiKey).toBe("arg-key");
   ```
-  The tests still verify the right behavior (the function reached the llmTranslateBundles call — meaning the key was accepted). The describe block title can optionally be updated to `"api-key accepted"`.
+  The behavioral coverage is preserved: the first test verifies the explicit key is used; the second verifies the arg takes precedence over the env var.
 
   **Add a new describe block** (e.g., after the "api-key forwarded" block):
   ```typescript
