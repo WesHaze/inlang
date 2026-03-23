@@ -46,4 +46,8 @@ describe("extractJson", () => {
   it("handles combination of fences + trailing comma + single quotes", () => {
     expect(extractJson("```json\n{'fr':['hello',]}\n```")).toEqual({ fr: ["hello"] });
   });
+
+  it("handles JSON values containing bracket characters in strings", () => {
+    expect(extractJson('{"key": "press {enter}"}')).toEqual({ key: "press {enter}" });
+  });
 });

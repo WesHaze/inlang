@@ -18,7 +18,7 @@ export function extractJson(raw: string): unknown {
   // Step 2: Strip markdown fences
   s = s.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
 
-  // Step 3: Extract JSON substring using balanced bracket scan
+  // Step 3: Extract JSON substring using string-aware balanced bracket scan
   const start = s.search(/[{[]/);
   if (start === -1) {
     throw new Error(`No JSON object or array found in LLM response: ${s.slice(0, 100)}`);
@@ -26,10 +26,20 @@ export function extractJson(raw: string): unknown {
   const openChar = s[start] as "{" | "[";
   const closeChar = openChar === "{" ? "}" : "]";
   let depth = 0;
+  let stringDelimiter: string | null = null;
+  let escaped = false;
   let end = -1;
   for (let i = start; i < s.length; i++) {
-    if (s[i] === openChar) depth++;
-    else if (s[i] === closeChar) {
+    const ch = s[i]!;
+    if (escaped) { escaped = false; continue; }
+    if (ch === "\\") { escaped = true; continue; }
+    if (stringDelimiter !== null) {
+      if (ch === stringDelimiter) stringDelimiter = null;
+      continue;
+    }
+    if (ch === '"' || ch === "'") { stringDelimiter = ch; continue; }
+    if (ch === openChar) depth++;
+    else if (ch === closeChar) {
       depth--;
       if (depth === 0) { end = i; break; }
     }

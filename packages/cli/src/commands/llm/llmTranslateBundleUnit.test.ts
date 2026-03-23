@@ -364,24 +364,25 @@ describe("llmTranslateBundle — retry on invalid JSON", () => {
 
 describe("llmTranslateBundle — retry on non-object response", () => {
   it("retries when LLM returns a bare array and succeeds on second attempt", async () => {
-    const project = await makeProject(["en-gb", "nl"]);
+    const project = await makeProject(["en-gb", "nl", "de"]);
     await insertSimpleBundle(project.db, "greet", "Hello");
     const [bundle] = await selectBundleNested(project.db).execute();
 
     mockComplete
-      .mockResolvedValueOnce(mockOk("[1, 2, 3]")) // bare array — wrong structure
-      .mockResolvedValueOnce(mockOk(JSON.stringify({ nl: [{ type: "text", value: "Hallo" }] })));
+      .mockResolvedValueOnce(mockOk("[1, 2, 3]")) // bare array — wrong structure, shape guard fires for multi-locale
+      .mockResolvedValueOnce(mockOk(JSON.stringify({ nl: [{ type: "text", value: "Hallo" }], de: [{ type: "text", value: "Hallo" }] })));
 
     const result = await llmTranslateBundle({
       bundle: bundle!,
       sourceLocale: "en-gb",
-      targetLocales: ["nl"],
+      targetLocales: ["nl", "de"],
       client: mockClient,
       model: MODEL,
     });
 
     expect(mockComplete).toHaveBeenCalledTimes(2);
     expect(result.data!.messages.find((m: NewMessageNested) => m.locale === "nl")).toBeDefined();
+    expect(result.data!.messages.find((m: NewMessageNested) => m.locale === "de")).toBeDefined();
   });
 });
 
@@ -505,6 +506,65 @@ describe("llmTranslateBundle — multiple source variants", () => {
     expect(mockComplete).toHaveBeenCalledTimes(2);
     const nl = result.data!.messages.find((m: NewMessageNested) => m.locale === "nl");
     expect(nl!.variants).toHaveLength(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// llmTranslateBundle — fenced JSON response
+// ---------------------------------------------------------------------------
+
+describe("llmTranslateBundle — fenced JSON response", () => {
+  it("succeeds without retrying when LLM wraps response in markdown fences", async () => {
+    const project = await makeProject();
+    await insertSimpleBundle(project.db, "greet", "hello");
+    const [bundle] = await selectBundleNested(project.db).execute();
+
+    const pattern = JSON.stringify([{ type: "text", value: "hallo" }]);
+    mockComplete.mockResolvedValueOnce(
+      mockOk(`\`\`\`json\n{"nl":${pattern}}\n\`\`\``),
+    );
+
+    const result = await llmTranslateBundle({
+      bundle: bundle!,
+      sourceLocale: "en-gb",
+      targetLocales: ["nl"],
+      model: MODEL,
+      client: mockClient,
+    });
+
+    expect(result.error).toBeUndefined();
+    expect(result.translated).toBe(true);
+    expect(mockComplete).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// llmTranslateBundle — bare-array normalization (single locale)
+// ---------------------------------------------------------------------------
+
+describe("llmTranslateBundle — bare-array normalization", () => {
+  it("succeeds when LLM returns a bare array for a single target locale", async () => {
+    const project = await makeProject();
+    await insertSimpleBundle(project.db, "greet", "hello");
+    const [bundle] = await selectBundleNested(project.db).execute();
+
+    const pattern = [{ type: "text", value: "hallo" }];
+    // LLM returns just the pattern array, not wrapped in {"nl":[...]}
+    mockComplete.mockResolvedValueOnce(mockOk(JSON.stringify(pattern)));
+
+    const result = await llmTranslateBundle({
+      bundle: bundle!,
+      sourceLocale: "en-gb",
+      targetLocales: ["nl"],
+      model: MODEL,
+      client: mockClient,
+    });
+
+    expect(result.error).toBeUndefined();
+    expect(result.translated).toBe(true);
+    expect(mockComplete).toHaveBeenCalledTimes(1);
+    const nl = result.data!.messages.find((m: NewMessageNested) => m.locale === "nl");
+    expect(nl?.variants[0]?.pattern).toEqual([{ type: "text", value: "hallo" }]);
   });
 });
 

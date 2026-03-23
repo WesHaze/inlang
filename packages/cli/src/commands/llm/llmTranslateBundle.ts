@@ -9,6 +9,7 @@ import type {
 } from "@inlang/sdk";
 import { type OpenRouterClient, type OpenRouterUsage } from "./openrouterClient.js";
 import { serializePattern, validateTranslatedPattern } from "./astSerializer.js";
+import { extractJson } from "./jsonExtractor.js";
 
 export type LlmTranslateBundleArgs = {
   bundle: BundleNested;
@@ -157,14 +158,18 @@ export async function llmTranslateBundle(
 
       let translationsMap: Record<string, unknown>;
       try {
-        const parsed = JSON.parse(response.content) as unknown;
-        if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+        const parsed = extractJson(response.content);
+        let normalized: unknown = parsed;
+        if (Array.isArray(parsed) && remainingLocales.length === 1) {
+          normalized = { [remainingLocales[0]!]: parsed };
+        }
+        if (typeof normalized !== "object" || normalized === null || Array.isArray(normalized)) {
           if (!args.quiet) console.warn(
             `${LOG_PREFIX} Bundle "${args.bundle.id}" (attempt ${attempt + 1}/${MAX_RETRIES}): LLM response was not a JSON object${attempt < MAX_RETRIES - 1 ? ", retrying..." : ", skipping variant"}`,
           );
           continue;
         }
-        translationsMap = parsed as Record<string, unknown>;
+        translationsMap = normalized as Record<string, unknown>;
       } catch {
         if (!args.quiet) console.warn(
           `${LOG_PREFIX} Bundle "${args.bundle.id}" (attempt ${attempt + 1}/${MAX_RETRIES}): failed to parse LLM response as JSON${attempt < MAX_RETRIES - 1 ? ", retrying..." : ", skipping variant"}`,
@@ -295,7 +300,7 @@ export async function llmTranslateBundles(
 
     let parsed: unknown;
     try {
-      parsed = JSON.parse(response.content);
+      parsed = extractJson(response.content);
     } catch {
       if (attempt < MAX_RETRIES - 1) {
         if (!args.quiet) console.warn(`${LOG_PREFIX} batch: failed to parse LLM response as JSON (attempt ${attempt + 1}/${MAX_RETRIES}), retrying...`);
