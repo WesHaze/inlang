@@ -1,4 +1,4 @@
-import { describe, expect, it, afterEach, beforeEach } from "vitest";
+import { describe, expect, it, vi, afterEach, beforeEach } from "vitest";
 import {
   insertBundleNested,
   loadProjectInMemory,
@@ -219,13 +219,13 @@ it("skips already-translated variants without calling OpenRouter", async () => {
   });
 
   const [bundle] = await selectBundleNested(project.db).execute();
-  // Pass a deliberately invalid key — if the function called OpenRouter it would get a 401 error.
-  // The skip path must return { data } before any API call is attempted.
+  // Use a mock client that throws if called — the skip path must return before any API call.
+  const neverCalledClient = { complete: vi.fn().mockRejectedValue(new Error("API must not be called on the skip path")) } as unknown as OpenRouterClient;
   const result = await llmTranslateBundle({
     bundle: bundle!,
     sourceLocale: "en-gb",
     targetLocales: ["nl"],
-    client: new OpenRouterClient({ apiKey: "invalid-key-should-not-be-used" }),
+    client: neverCalledClient,
     model: DEFAULT_MODEL,
   });
 
