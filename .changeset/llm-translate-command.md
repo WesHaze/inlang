@@ -26,7 +26,7 @@ npx @inlang/cli llm translate --project ./project.inlang
 | `--targetLocales <locales...>` | all non-source locales | Space-separated or comma-separated list of target locales, e.g. `--targetLocales fr de ja` or `--targetLocales fr,de`. Defaults to every locale defined in project settings except the source. |
 | `--context <text>` | — | Inline brand/style instructions passed to the LLM with every batch. Use this for short instructions. |
 | `--context-file <path>` | — | Path to a markdown file containing brand/style instructions. **Takes precedence over `--context` if both are supplied — they are not merged.** Recommended for longer briefs covering tone, terminology, and do-not-translate rules. |
-| `--batch-size <n>` | `10` | Number of bundles sent to the LLM in a single API call. Larger batches are faster but increase the chance of a parse error requiring a retry. |
+| `--batch-size <n>` | `50` | Number of bundles sent to the LLM in a single API call. Larger batches are faster but increase the chance of a parse error requiring a retry. |
 | `--force` | `false` | Overwrite existing non-empty translations. Without this flag, any locale that already has a translation for a given bundle is silently skipped. |
 | `--dry-run` | `false` | Print what would be translated without making any API calls. Skips the API key requirement entirely — useful for previewing scope in CI. |
 | `--strict` | `false` | Exit with code 1 if any bundles could not be fully translated (e.g. the LLM returned malformed output that failed validation after all retries). Without `--strict` the command exits 0 as long as there are no hard errors. Use in CI to fail a pipeline when translations are incomplete. |
