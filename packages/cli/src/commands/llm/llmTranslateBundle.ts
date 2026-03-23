@@ -31,6 +31,8 @@ export type LlmTranslateBundlesResult = {
 
 export type LlmTranslateBundleResult = {
   data?: NewBundleNested;
+  /** true only when at least one variant was actually written */
+  translated?: boolean;
   error?: string;
   usage?: OpenRouterUsage;
 };
@@ -108,6 +110,7 @@ export async function llmTranslateBundle(
     thinkingTokens: 0,
     totalTokens: 0,
   };
+  let anyTranslated = false;
 
   for (const { sourceVariant, targetLocales } of work.values()) {
     let remainingLocales = [...targetLocales];
@@ -191,6 +194,7 @@ export async function llmTranslateBundle(
           (m: NewMessageNested) => m.locale === targetLocale,
         );
 
+        anyTranslated = true;
         if (targetMessage) {
           const existingVariant = findMatchingVariant(
             targetMessage.variants,
@@ -229,7 +233,7 @@ export async function llmTranslateBundle(
     }
   }
 
-  return { data: copy, usage: totalUsage };
+  return { data: copy, translated: anyTranslated, usage: totalUsage };
 }
 
 export async function llmTranslateBundles(
@@ -373,6 +377,7 @@ export async function llmTranslateBundles(
   }
 
   // Apply translations back to copies
+  const translatedIndices = new Set<number>();
   for (const [key, { copyIdx, sourceVariant, targetLocales }] of workMap) {
     const copy = copies[copyIdx]!;
     const sourceMessage = copy.messages.find((m) => m.locale === args.sourceLocale)!;
@@ -392,6 +397,7 @@ export async function llmTranslateBundles(
         continue;
       }
 
+      translatedIndices.add(copyIdx);
       const targetMessage = copy.messages.find((m) => m.locale === targetLocale);
       if (targetMessage) {
         const existingVariant = findMatchingVariant(targetMessage.variants, sourceVariant.matches ?? []);
@@ -419,7 +425,9 @@ export async function llmTranslateBundles(
 
   return {
     results: copies.map((data, i) =>
-      bundleErrors.has(i) ? { error: bundleErrors.get(i) } : { data },
+      bundleErrors.has(i)
+        ? { error: bundleErrors.get(i) }
+        : { data, translated: translatedIndices.has(i) },
     ),
     usage: accumulatedUsage,
   };

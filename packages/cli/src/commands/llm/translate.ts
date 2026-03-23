@@ -62,7 +62,7 @@ export const translate = new Command()
         ? (options.targetLocales as string[]).flatMap((s: string) => s.split(","))
         : settings.locales.filter((l: string) => l !== sourceLocale);
 
-      await llmTranslateCommandAction({
+      const { errorCount } = await llmTranslateCommandAction({
         project,
         sourceLocale,
         targetLocales,
@@ -77,6 +77,7 @@ export const translate = new Command()
 
       if (!options.dryRun) {
         await saveProjectToDirectory({ fs, path: args.project, project });
+        if (errorCount > 0) exitCode = 1;
       }
     } catch (error) {
       logError(error);
@@ -101,7 +102,7 @@ export type LlmTranslateCommandActionArgs = {
 
 export async function llmTranslateCommandAction(
   args: LlmTranslateCommandActionArgs,
-): Promise<void> {
+): Promise<{ successCount: number; errorCount: number }> {
   const {
     project,
     sourceLocale,
@@ -125,14 +126,14 @@ export async function llmTranslateCommandAction(
     log.warn(
       "No bundles found. Check your project setup with `inlang validate`.",
     );
-    return;
+    return { successCount: 0, errorCount: 0 };
   }
 
   if (dryRun) {
     log.info(
       `Dry run: would translate ${bundles.length} bundle(s) in batches of ${batchSize} from "${sourceLocale}" to [${targetLocales.join(", ")}] using model "${model}".`,
     );
-    return;
+    return { successCount: 0, errorCount: 0 };
   }
 
   const chunks: typeof bundles[] = [];
@@ -160,7 +161,7 @@ export async function llmTranslateCommandAction(
               if (result.data) {
                 try {
                   await upsertBundleNested(project.db, result.data);
-                  successCount++;
+                  if (result.translated) successCount++;
                 } catch (upsertErr) {
                   errorCount++;
                   log.warn(
@@ -182,4 +183,6 @@ export async function llmTranslateCommandAction(
   log.success(
     `LLM translate complete. ${successCount} bundle(s) translated, ${errorCount} error(s). Total tokens used: ${totalTokens}.`,
   );
+
+  return { successCount, errorCount };
 }
