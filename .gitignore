@@ -407,3 +407,5 @@ AGENTS.md
 .github/agents/
 .github/prompts/
 .github/skills/
+
+docs/superpowers/*
