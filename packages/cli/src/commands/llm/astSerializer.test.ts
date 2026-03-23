@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   serializePattern,
   validateTranslatedPattern,
+  rebuildPatternFromString,
 } from "./astSerializer.js";
 import type { Pattern } from "@inlang/sdk";
 
@@ -31,6 +32,114 @@ const sourceWithMarkup: Pattern = [
 const sourceWithMarkupOptions: Pattern = [
   { type: "markup-standalone", name: "br", options: [], attributes: [] },
 ];
+
+describe("rebuildPatternFromString", () => {
+  it("wraps a plain string as a single text node when source has no variables", () => {
+    const source: Pattern = [{ type: "text", value: "Save" }];
+    const result = rebuildPatternFromString("Opslaan", source);
+    expect(result).toEqual([{ type: "text", value: "Opslaan" }]);
+  });
+
+  it("reconstructs [text, expr, text] when variable is in the middle", () => {
+    // "Hello {name}!" → "Hallo {name}!"
+    const source: Pattern = [
+      { type: "text", value: "Hello " },
+      { type: "expression", arg: { type: "variable-reference", name: "name" } },
+      { type: "text", value: "!" },
+    ];
+    const result = rebuildPatternFromString("Hallo {name}!", source);
+    expect(result).toEqual([
+      { type: "text", value: "Hallo " },
+      { type: "expression", arg: { type: "variable-reference", name: "name" } },
+      { type: "text", value: "!" },
+    ]);
+  });
+
+  it("reconstructs [text, expr] when variable is at the end — trailing empty text", () => {
+    // "Remove {label}" → "Entfernen {label}"
+    const source: Pattern = [
+      { type: "text", value: "Remove " },
+      { type: "expression", arg: { type: "variable-reference", name: "label" } },
+    ];
+    const result = rebuildPatternFromString("Entfernen {label}", source);
+    expect(result).toEqual([
+      { type: "text", value: "Entfernen " },
+      { type: "expression", arg: { type: "variable-reference", name: "label" } },
+    ]);
+  });
+
+  it("reconstructs [expr, text] when variable is at the start — leading empty text", () => {
+    // "{count}/2000" stays "{count}/2000" but translated text part may change
+    const source: Pattern = [
+      { type: "expression", arg: { type: "variable-reference", name: "count" } },
+      { type: "text", value: "/2000" },
+    ];
+    const result = rebuildPatternFromString("{count}/2000", source);
+    expect(result).toEqual([
+      { type: "expression", arg: { type: "variable-reference", name: "count" } },
+      { type: "text", value: "/2000" },
+    ]);
+  });
+
+  it("reconstructs multi-variable pattern [text, expr, text, expr, text]", () => {
+    // "From {start} to {end}" → "Von {start} bis {end}"
+    const source: Pattern = [
+      { type: "text", value: "From " },
+      { type: "expression", arg: { type: "variable-reference", name: "start" } },
+      { type: "text", value: " to " },
+      { type: "expression", arg: { type: "variable-reference", name: "end" } },
+      { type: "text", value: "." },
+    ];
+    const result = rebuildPatternFromString("Von {start} bis {end}.", source);
+    expect(result).toEqual([
+      { type: "text", value: "Von " },
+      { type: "expression", arg: { type: "variable-reference", name: "start" } },
+      { type: "text", value: " bis " },
+      { type: "expression", arg: { type: "variable-reference", name: "end" } },
+      { type: "text", value: "." },
+    ]);
+  });
+
+  it("inserts source expression node even when LLM dropped the variable from the string", () => {
+    // LLM returned "Entfernen" — forgot to include {label}
+    const source: Pattern = [
+      { type: "text", value: "Remove " },
+      { type: "expression", arg: { type: "variable-reference", name: "label" } },
+    ];
+    const result = rebuildPatternFromString("Entfernen", source);
+    // Expression is preserved from source; trailing text is empty
+    expect(result).toEqual([
+      { type: "text", value: "Entfernen" },
+      { type: "expression", arg: { type: "variable-reference", name: "label" } },
+    ]);
+  });
+
+  it("result length always matches source length", () => {
+    const source: Pattern = [
+      { type: "text", value: "Hello " },
+      { type: "expression", arg: { type: "variable-reference", name: "name" } },
+      { type: "text", value: ", welcome back!" },
+    ];
+    const cases = [
+      "Hallo {name}, willkommen zurück!",
+      "Hallo {name}",   // trailing text missing
+      "Hallo",          // variable dropped
+    ];
+    for (const str of cases) {
+      expect(rebuildPatternFromString(str, source)).toHaveLength(source.length);
+    }
+  });
+
+  it("result passes validateTranslatedPattern after rebuild", () => {
+    const source: Pattern = [
+      { type: "text", value: "Remove " },
+      { type: "expression", arg: { type: "variable-reference", name: "label" } },
+    ];
+    const rebuilt = rebuildPatternFromString("Entfernen {label}", source);
+    const validation = validateTranslatedPattern(source, rebuilt);
+    expect(validation.valid).toBe(true);
+  });
+});
 
 describe("serializePattern", () => {
   it("returns a JSON string of the pattern array", () => {

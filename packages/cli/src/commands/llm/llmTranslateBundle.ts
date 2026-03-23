@@ -8,7 +8,7 @@ import type {
   Pattern,
 } from "@inlang/sdk";
 import { type OpenRouterClient, type OpenRouterUsage } from "./openrouterClient.js";
-import { serializePattern, validateTranslatedPattern } from "./astSerializer.js";
+import { serializePattern, validateTranslatedPattern, rebuildPatternFromString } from "./astSerializer.js";
 import { extractJson } from "./jsonExtractor.js";
 import { log } from "../../utilities/log.js";
 
@@ -192,11 +192,9 @@ export async function llmTranslateBundle(
 
       const nextRemainingLocales: string[] = [];
       for (const targetLocale of remainingLocales) {
-        const rawPattern = coerceRawPattern(translationsMap[targetLocale]);
-        const validation = validateTranslatedPattern(
-          sourceVariant.pattern ?? [],
-          rawPattern,
-        );
+        const src = sourceVariant.pattern ?? [];
+        const rawPattern = coerceRawPattern(translationsMap[targetLocale], src);
+        const validation = validateTranslatedPattern(src, rawPattern);
 
         if (!validation.valid) {
           if (!args.quiet) log.warn(
@@ -362,8 +360,9 @@ export async function llmTranslateBundles(
           ? localeMap
           : localeMapObj[targetLocale] ??
             (targetLocales.length === 1 && "locale" in localeMapObj ? localeMapObj["locale"] : undefined);
-      const rawPattern = coerceRawPattern(rawLookup);
-      const validation = validateTranslatedPattern(sourceVariant.pattern ?? [], rawPattern);
+      const src = sourceVariant.pattern ?? [];
+      const rawPattern = coerceRawPattern(rawLookup, src);
+      const validation = validateTranslatedPattern(src, rawPattern);
       if (!validation.valid) {
         if (!args.quiet) log.warn(`${LOG_PREFIX} Bundle "${copy.id}" → ${targetLocale}: ${validation.error}, skipping`);
         continue;
@@ -385,14 +384,20 @@ export async function llmTranslateBundles(
 }
 
 /**
- * LLMs sometimes return a bare string or an array of strings instead of a
- * proper pattern array.  Coerce either form so validation can proceed.
+ * LLMs sometimes return a bare string or string array instead of a proper
+ * pattern array.  Coerce either form back to a structured Pattern.
+ *
+ * When `source` is provided and contains expression/markup nodes, the string
+ * is parsed for `{varName}` placeholders which are matched back to source
+ * nodes — preserving variable structure even when the LLM collapsed the
+ * whole pattern to a single translated string.
  */
-function coerceRawPattern(raw: unknown): unknown {
+function coerceRawPattern(raw: unknown, source: Pattern): unknown {
   if (typeof raw === "string") {
-    return [{ type: "text", value: raw }];
+    return rebuildPatternFromString(raw, source);
   }
   if (Array.isArray(raw) && raw.every((n) => typeof n === "string")) {
+    if (raw.length === 1) return rebuildPatternFromString(raw[0]!, source);
     return raw.map((n) => ({ type: "text", value: n }));
   }
   return raw;

@@ -12,6 +12,79 @@ export function serializePattern(pattern: Pattern): string {
 }
 
 /**
+ * Reconstructs a proper Pattern from a collapsed string returned by the LLM.
+ *
+ * When an LLM receives a pattern like `["Remove ", {expr:label}]` it sometimes
+ * responds with a plain string `"Entfernen {label}"` rather than the full node
+ * array.  This function parses the `{variableName}` placeholders back out,
+ * matches them to the source expression nodes by name, and rebuilds the
+ * correctly-structured pattern.
+ *
+ * - Non-text source nodes (expression, markup-*) are always taken verbatim from
+ *   source — they are never translated.
+ * - Text segments between placeholders become text nodes.
+ * - Missing trailing/leading text becomes an empty text node so the length
+ *   always matches the source.
+ * - If the LLM drops a variable entirely, the source expression node is still
+ *   inserted at its original position (the variable will still render at runtime).
+ */
+export function rebuildPatternFromString(str: string, source: Pattern): Pattern {
+  // Collect variable names from expression nodes in source order.
+  const varNames: string[] = [];
+  for (const node of source) {
+    if (
+      node.type === "expression" &&
+      (node as { type: string; arg?: { type?: string; name?: string } }).arg?.type === "variable-reference"
+    ) {
+      varNames.push(
+        (node as { type: string; arg: { type: string; name: string } }).arg.name,
+      );
+    }
+  }
+
+  if (varNames.length === 0) {
+    return [{ type: "text", value: str }];
+  }
+
+  // Build regex matching any of the known variable names as {name}.
+  const escaped = varNames.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const regex = new RegExp(`\\{(${escaped.join("|")})\\}`, "g");
+
+  // Tokenise the translated string into alternating text / var-reference segments.
+  type Seg = { kind: "text"; value: string } | { kind: "var"; name: string };
+  const segs: Seg[] = [];
+  let last = 0;
+  let m: RegExpExecArray | null;
+  while ((m = regex.exec(str)) !== null) {
+    if (m.index > last) segs.push({ kind: "text", value: str.slice(last, m.index) });
+    segs.push({ kind: "var", name: m[1]! });
+    last = m.index + m[0].length;
+  }
+  if (last < str.length) segs.push({ kind: "text", value: str.slice(last) });
+
+  // Walk the source structure and pull text from the segment stream.
+  const result: Pattern = [];
+  let si = 0;
+
+  for (const srcNode of source) {
+    if (srcNode.type !== "text") {
+      // Consume a matching var segment if present (may be absent if LLM dropped it).
+      if (si < segs.length && segs[si]!.kind === "var") si++;
+      result.push(srcNode); // always copy from source — variables are never translated
+    } else {
+      // Consume a text segment if the next one is text; otherwise emit empty.
+      if (si < segs.length && segs[si]!.kind === "text") {
+        result.push({ type: "text", value: (segs[si++] as { kind: "text"; value: string }).value });
+      } else {
+        result.push({ type: "text", value: "" });
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
  * Normalizes markup node optional fields so that `undefined` and `[]` are
  * treated as equivalent during deep-equality checks.
  */

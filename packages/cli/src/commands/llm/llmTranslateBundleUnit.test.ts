@@ -797,6 +797,109 @@ describe("llmTranslateBundles — all bundles missing source locale (mistyped --
 });
 
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// String-coercion with variable reconstruction
+// ---------------------------------------------------------------------------
+
+describe("llmTranslateBundles — string coercion rebuilds expression nodes", () => {
+  it("reconstructs [text, expr] when LLM returns a plain string with {varName}", async () => {
+    const project = await makeProject(["en-gb", "nl"]);
+    await insertBundleNested(project.db, {
+      id: "remove_label",
+      messages: [
+        {
+          id: "remove_label_en",
+          bundleId: "remove_label",
+          locale: "en-gb",
+          variants: [
+            {
+              id: "remove_label_en_v",
+              messageId: "remove_label_en",
+              pattern: [
+                { type: "text", value: "Remove " },
+                { type: "expression", arg: { type: "variable-reference", name: "label" } },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+    const bundles = await selectBundleNested(project.db).execute();
+    const variantId = bundles[0]!.messages[0]!.variants[0]!.id;
+    const key = `remove_label::${variantId}`;
+
+    // LLM collapses the pattern to a plain string — "Entfernen {label}"
+    mockComplete.mockResolvedValueOnce(
+      mockOk(JSON.stringify({ [key]: { nl: "Entfernen {label}" } })),
+    );
+
+    const result = await llmTranslateBundles({
+      bundles,
+      sourceLocale: "en-gb",
+      targetLocales: ["nl"],
+      client: mockClient,
+      model: MODEL,
+      quiet: true,
+    });
+
+    expect(result.results[0]!.error).toBeUndefined();
+    expect(result.results[0]!.translated).toBe(true);
+    const nl = result.results[0]!.data!.messages.find((m: NewMessageNested) => m.locale === "nl");
+    expect(nl?.variants[0]?.pattern).toEqual([
+      { type: "text", value: "Entfernen " },
+      { type: "expression", arg: { type: "variable-reference", name: "label" } },
+    ]);
+  });
+
+  it("reconstructs [expr, text] when variable is at the start — e.g. {count}/2000", async () => {
+    const project = await makeProject(["en-gb", "nl"]);
+    await insertBundleNested(project.db, {
+      id: "counter",
+      messages: [
+        {
+          id: "counter_en",
+          bundleId: "counter",
+          locale: "en-gb",
+          variants: [
+            {
+              id: "counter_en_v",
+              messageId: "counter_en",
+              pattern: [
+                { type: "expression", arg: { type: "variable-reference", name: "count" } },
+                { type: "text", value: "/2000" },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+    const bundles = await selectBundleNested(project.db).execute();
+    const variantId = bundles[0]!.messages[0]!.variants[0]!.id;
+    const key = `counter::${variantId}`;
+
+    mockComplete.mockResolvedValueOnce(
+      mockOk(JSON.stringify({ [key]: { nl: "{count}/2000" } })),
+    );
+
+    const result = await llmTranslateBundles({
+      bundles,
+      sourceLocale: "en-gb",
+      targetLocales: ["nl"],
+      client: mockClient,
+      model: MODEL,
+      quiet: true,
+    });
+
+    expect(result.results[0]!.translated).toBe(true);
+    const nl = result.results[0]!.data!.messages.find((m: NewMessageNested) => m.locale === "nl");
+    expect(nl?.variants[0]?.pattern).toEqual([
+      { type: "expression", arg: { type: "variable-reference", name: "count" } },
+      { type: "text", value: "/2000" },
+    ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // llmTranslateBundles — bare-array single-locale fallback
 // ---------------------------------------------------------------------------
 
