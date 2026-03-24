@@ -1,0 +1,5 @@
+{
+  "bundleBatchSize": 20,
+  "interpretationContext": "",
+  "hallucinationRetries": 3
+}
