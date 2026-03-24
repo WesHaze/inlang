@@ -26,15 +26,24 @@ export async function writeTranslations(
   project: InlangProject,
   input: { translations: WriteTranslation[] }
 ): Promise<void> {
+  // Group by bundleId so each bundle is upserted once
+  const byBundle = new Map<string, WriteTranslation[]>()
   for (const t of input.translations) {
-    const messageId = t.existingMessageId ?? randomUUID()
+    const group = byBundle.get(t.bundleId) ?? []
+    group.push(t)
+    byBundle.set(t.bundleId, group)
+  }
+
+  for (const [bundleId, translations] of byBundle) {
+    const first = translations[0]!
     await upsertBundleNested(project.db, {
-      id: t.bundleId,
-      declarations: t.declarations,
-      messages: [
-        {
+      id: bundleId,
+      declarations: first.declarations,
+      messages: translations.map((t) => {
+        const messageId = t.existingMessageId ?? randomUUID()
+        return {
           id: messageId,
-          bundleId: t.bundleId,
+          bundleId,
           locale: t.locale,
           selectors: t.selectors,
           variants: t.variants.map((v) => ({
@@ -43,8 +52,8 @@ export async function writeTranslations(
             matches: v.matches,
             pattern: v.pattern,
           })),
-        },
-      ],
+        }
+      }),
     })
   }
 }
@@ -86,7 +95,10 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     raw += chunk
   }
 
-  await writeTranslations(project, JSON.parse(raw))
-  await saveProjectToDirectory({ fs: fsPromises, path: projectPath, project })
-  await project.close()
+  try {
+    await writeTranslations(project, JSON.parse(raw))
+    await saveProjectToDirectory({ fs: fsPromises, path: projectPath, project })
+  } finally {
+    await project.close()
+  }
 }

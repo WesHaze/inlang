@@ -102,6 +102,31 @@ describe("writeTranslations", () => {
     expect(enMessage!.variants[0]!.pattern).toEqual([{ type: "text", value: "Hello" }])
   })
 
+  it("handles multiple translations for the same bundle in one call", async () => {
+    const project = await loadProjectInMemory({
+      blob: await newProject({ settings: { baseLocale: "en", locales: ["en", "de", "fr"] } }),
+    })
+    await insertBundleNested(project.db, {
+      id: "multi",
+      messages: [
+        { id: "m-en", bundleId: "multi", locale: "en", variants: [{ id: "v-en", messageId: "m-en", matches: [], pattern: [{ type: "text", value: "Hello" }] }] },
+      ],
+    })
+
+    await writeTranslations(project, {
+      translations: [
+        { bundleId: "multi", locale: "de", declarations: [], selectors: [], existingMessageId: null, variants: [{ matches: [], pattern: [{ type: "text", value: "Hallo" }] }] },
+        { bundleId: "multi", locale: "fr", declarations: [], selectors: [], existingMessageId: null, variants: [{ matches: [], pattern: [{ type: "text", value: "Bonjour" }] }] },
+      ],
+    })
+
+    const bundle = await selectBundleNested(project.db)
+      .where("bundle.id", "=", "multi")
+      .executeTakeFirstOrThrow()
+    expect(bundle.messages.filter((m) => m.locale === "de")).toHaveLength(1)
+    expect(bundle.messages.filter((m) => m.locale === "fr")).toHaveLength(1)
+  })
+
   it("generates valid UUIDs for new message and variant ids", async () => {
     const project = await makeProjectWithSource()
 
