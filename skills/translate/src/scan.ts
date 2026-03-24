@@ -89,7 +89,7 @@ export async function generateScanOutput(project: InlangProject, config: Config)
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (process.argv.includes("--help")) {
     process.stdout.write(
-      "Usage: node dist/scan.js\n" +
+      "Usage: node scripts/scan.js\n" +
         "Discovers *.inlang project in CWD, outputs batch JSON to stdout.\n" +
         "Configure via config.json in the skill directory.\n"
     )

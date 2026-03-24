@@ -3,24 +3,32 @@ import { fileURLToPath } from "node:url"
 import fs from "node:fs"
 import fsPromises from "node:fs/promises"
 import { resolve } from "node:path"
+import { Type, type Static } from "@sinclair/typebox"
 import {
   loadProjectFromDirectory,
   saveProjectToDirectory,
   upsertBundleNested,
-  type Declaration,
+  Declaration,
+  VariableReference,
+  Pattern,
   type InlangProject,
-  type Variant,
-  type VariableReference,
 } from "@inlang/sdk"
 
-type WriteTranslation = {
-  bundleId: string
-  locale: string
-  declarations: Declaration[]
-  selectors: VariableReference[]
-  existingMessageId: string | null
-  variants: Array<Pick<Variant, "matches" | "pattern">>
-}
+const VariantShape = Type.Object({
+  matches: Type.Array(Type.Any()),
+  pattern: Pattern,
+})
+
+const WriteTranslationSchema = Type.Object({
+  bundleId: Type.String(),
+  locale: Type.String(),
+  declarations: Type.Array(Declaration),
+  selectors: Type.Array(VariableReference),
+  existingMessageId: Type.Union([Type.String(), Type.Null()]),
+  variants: Type.Array(VariantShape),
+})
+
+type WriteTranslation = Static<typeof WriteTranslationSchema>
 
 export async function writeTranslations(
   project: InlangProject,
@@ -62,9 +70,9 @@ export async function writeTranslations(
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (process.argv.includes("--help")) {
     process.stdout.write(
-      "Usage: node dist/write.js < input.json\n" +
+      "Usage: node scripts/write.js < input.json\n" +
         "Reads passing translations from stdin, writes to the *.inlang project in CWD.\n" +
-        "\nInput shape: { translations: [{ bundleId, locale, declarations, selectors, existingMessageId, variants }] }\n"
+        `\nInput shape: { translations: [{ ${Object.keys(WriteTranslationSchema.properties).join(", ")} }] }\n`
     )
     process.exit(0)
   }

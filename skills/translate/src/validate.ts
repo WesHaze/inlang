@@ -1,15 +1,21 @@
 import { fileURLToPath } from "node:url"
+import { Type, type Static } from "@sinclair/typebox"
 import { Value } from "@sinclair/typebox/value"
-import { Pattern, type Variant } from "@inlang/sdk"
+import { Pattern, Text } from "@inlang/sdk"
 
-type VariantShape = Pick<Variant, "matches" | "pattern">
+const VariantShape = Type.Object({
+  matches: Type.Array(Type.Any()),
+  pattern: Pattern,
+})
 
-type TranslationToValidate = {
-  bundleId: string
-  locale: string
-  sourceVariants: VariantShape[]
-  variants: VariantShape[]
-}
+const TranslationSchema = Type.Object({
+  bundleId: Type.String(),
+  locale: Type.String(),
+  sourceVariants: Type.Array(VariantShape),
+  variants: Type.Array(VariantShape),
+})
+
+type TranslationToValidate = Static<typeof TranslationSchema>
 
 export function validateTranslations(input: { translations: TranslationToValidate[] }): void {
   for (const t of input.translations) {
@@ -38,11 +44,22 @@ export function validateTranslations(input: { translations: TranslationToValidat
 
       for (let j = 0; j < src.pattern.length; j++) {
         const srcNode = src.pattern[j]!
-        const tgtNode = tgt.pattern[j]
-        if (srcNode.type !== tgtNode!.type) {
-          throw new Error(
-            `${label} variant ${i}: node ${j} type changed from '${srcNode.type}' to '${tgtNode!.type}'`
-          )
+        const tgtNode = tgt.pattern[j]!
+
+        if (Value.Check(Text, srcNode)) {
+          // Text nodes: only the value field may change
+          if (!Value.Check(Text, tgtNode)) {
+            throw new Error(
+              `${label} variant ${i}: node ${j} type changed from '${srcNode.type}' to '${tgtNode.type}'`
+            )
+          }
+        } else {
+          // Non-text nodes (expression, markup-*) must be preserved exactly
+          if (!Value.Equal(srcNode, tgtNode)) {
+            throw new Error(
+              `${label} variant ${i}: non-text node ${j} (type '${srcNode.type}') was modified — must be preserved exactly`
+            )
+          }
         }
       }
     }
@@ -53,9 +70,9 @@ export function validateTranslations(input: { translations: TranslationToValidat
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (process.argv.includes("--help")) {
     process.stdout.write(
-      "Usage: node dist/validate.js < input.json\n" +
+      "Usage: node scripts/validate.js < input.json\n" +
         "Validates translation JSON from stdin. Exits non-zero and prints error to stderr on failure.\n" +
-        "\nInput shape: { translations: [{ bundleId, locale, sourceVariants, variants }] }\n"
+        `\nInput shape: { translations: [{ ${Object.keys(TranslationSchema.properties).join(", ")} }] }\n`
     )
     process.exit(0)
   }

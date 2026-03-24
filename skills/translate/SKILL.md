@@ -22,7 +22,7 @@ Edit `config.json` in the skill directory before running:
 ### 1. Scan
 
 ```bash
-node dist/scan.js
+node scripts/scan.js
 ```
 
 Outputs JSON to stdout: `{ project, interpretationContext, batches[] }`.
@@ -58,7 +58,7 @@ Produce output JSON:
 
 Then validate:
 ```bash
-echo '<translation-json>' | node dist/validate.js
+echo '<translation-json>' | node scripts/validate.js
 ```
 
 Where the validate input is:
@@ -90,7 +90,7 @@ Return to the main agent:
 Collect all `passing` arrays from all subagents. Concatenate into a single payload and pipe to write.js:
 
 ```bash
-echo '{ "translations": [...all passing...] }' | node dist/write.js
+echo '{ "translations": [...all passing...] }' | node scripts/write.js
 ```
 
 ### 4. Report
