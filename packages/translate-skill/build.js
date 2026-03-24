@@ -10,6 +10,7 @@ const ctx = await context({
   format: "esm",
   target: "node18",
   minify: false,
+  // https://github.com/evanw/esbuild/issues/1921#issuecomment-1403107887
   banner: {
     js: `
 import { createRequire as __createRequire } from 'node:module';
