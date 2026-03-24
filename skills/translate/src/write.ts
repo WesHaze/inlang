@@ -68,15 +68,6 @@ export async function writeTranslations(
 
 // Script entry
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  if (process.argv.includes("--help")) {
-    process.stdout.write(
-      "Usage: node scripts/write.js < input.json\n" +
-        "Reads passing translations from stdin, writes to the *.inlang project in CWD.\n" +
-        `\nInput shape: { translations: [{ ${Object.keys(WriteTranslationSchema.properties).join(", ")} }] }\n`
-    )
-    process.exit(0)
-  }
-
   const cwd = process.cwd()
   const entries = fs.readdirSync(cwd, { withFileTypes: true })
   const matches = entries

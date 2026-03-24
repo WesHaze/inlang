@@ -68,15 +68,6 @@ export function validateTranslations(input: { translations: TranslationToValidat
 
 // Script entry — reads stdin, validates, exits non-zero on failure
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  if (process.argv.includes("--help")) {
-    process.stdout.write(
-      "Usage: node scripts/validate.js < input.json\n" +
-        "Validates translation JSON from stdin. Exits non-zero and prints error to stderr on failure.\n" +
-        `\nInput shape: { translations: [{ ${Object.keys(TranslationSchema.properties).join(", ")} }] }\n`
-    )
-    process.exit(0)
-  }
-
   let raw = ""
   process.stdin.setEncoding("utf8")
   for await (const chunk of process.stdin) {
