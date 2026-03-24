@@ -1,0 +1,24 @@
+{
+  "name": "@inlang/translate-skill",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "cross-env NODE_ENV=production node ./build.js && tsc --noEmit",
+    "dev": "node ./build.js",
+    "test": "tsc --noEmit && vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@inlang/sdk": "workspace:*",
+    "@sinclair/typebox": "^0.31.17"
+  },
+  "devDependencies": {
+    "@inlang/tsconfig": "workspace:*",
+    "@types/node": "^22.5.1",
+    "cross-env": "^7.0.3",
+    "esbuild": "^0.19.2",
+    "typescript": "^5.5.2",
+    "vitest": "^3.2.4"
+  }
+}

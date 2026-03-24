@@ -1,0 +1,9 @@
+{
+  "extends": "@inlang/tsconfig/default",
+  "include": ["src/**/*.ts"],
+  "compilerOptions": {
+    "outDir": "dist",
+    "resolveJsonModule": true,
+    "types": ["node"]
+  }
+}
