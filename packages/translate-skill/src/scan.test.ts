@@ -96,6 +96,20 @@ describe("generateScanOutput", () => {
     expect(bundle.missingLocales).toEqual([{ locale: "fr", existingMessageId: null }])
   })
 
+  it("includes declarations in scan output", async () => {
+    const project = await makeProject(["en", "de"])
+    await insertBundleNested(project.db, {
+      id: "with-decl",
+      declarations: [{ type: "input-variable", name: "count" }],
+      messages: [
+        { id: "m-en", bundleId: "with-decl", locale: "en", variants: [{ id: "v-en", messageId: "m-en", matches: [], pattern: [{ type: "text", value: "Hello" }] }] },
+      ],
+    })
+    const output = await generateScanOutput(project, defaultConfig)
+    const bundle = output.batches[0]!.bundles[0]!
+    expect(bundle.declarations).toEqual([{ type: "input-variable", name: "count" }])
+  })
+
   it("batches bundles by bundleBatchSize", async () => {
     const project = await makeProject(["en", "de"])
     // Insert 3 bundles, batch size 2 → 2 batches

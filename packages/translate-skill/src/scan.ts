@@ -1,5 +1,5 @@
 import { fileURLToPath } from "node:url"
-import { resolve, dirname } from "node:path"
+import { resolve } from "node:path"
 import fs from "node:fs"
 import {
   loadProjectFromDirectory,
@@ -115,9 +115,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 
   const projectPath = matches[0]!
 
-  // __dirname is provided by the esbuild banner polyfill in dist/scan.js
-  const __filename = fileURLToPath(import.meta.url)
-  const __dirname = dirname(__filename)
   const configPath = resolve(__dirname, "../config.json")
 
   let config: Config = { bundleBatchSize: 20, interpretationContext: "", hallucinationRetries: 3 }
