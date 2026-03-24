@@ -110,6 +110,18 @@ describe("generateScanOutput", () => {
     expect(bundle.declarations).toEqual([{ type: "input-variable", name: "count" }])
   })
 
+  it("skips bundle where source message has no variants", async () => {
+    const project = await makeProject(["en", "de"])
+    await insertBundleNested(project.db, {
+      id: "empty-source",
+      messages: [
+        { id: "m-en", bundleId: "empty-source", locale: "en", variants: [] },
+      ],
+    })
+    const output = await generateScanOutput(project, defaultConfig)
+    expect(output.batches).toHaveLength(0)
+  })
+
   it("batches bundles by bundleBatchSize", async () => {
     const project = await makeProject(["en", "de"])
     // Insert 3 bundles, batch size 2 → 2 batches

@@ -115,7 +115,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 
   const projectPath = matches[0]!
 
-  const configPath = resolve(__dirname, "../config.json")
+  const configPath = fileURLToPath(new URL("../config.json", import.meta.url))
 
   let config: Config = { bundleBatchSize: 20, interpretationContext: "", hallucinationRetries: 3 }
   try {
@@ -134,6 +134,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 
   const errors = await project.errors.get()
   if (errors.length > 0) {
+    await project.close()
     for (const err of errors) {
       process.stderr.write(`Project error: ${err.message}\n`)
     }
@@ -141,6 +142,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   }
 
   const output = await generateScanOutput(project, config)
+  await project.close()
 
   if (output.batches.length === 0) {
     process.stderr.write("No missing translations found. Nothing to do.\n")
