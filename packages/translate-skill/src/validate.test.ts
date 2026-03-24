@@ -97,6 +97,29 @@ describe("validateTranslations", () => {
     ).toThrow()
   })
 
+  it("throws when translated pattern has more nodes than source", () => {
+    expect(() =>
+      validateTranslations({
+        translations: [
+          {
+            bundleId: "welcome",
+            locale: "fr",
+            sourceVariants: [{ matches: [], pattern: [{ type: "text" as const, value: "Hello" }] }],
+            variants: [
+              {
+                matches: [],
+                pattern: [
+                  { type: "text" as const, value: "Bonjour" },
+                  { type: "text" as const, value: " extra node" },
+                ],
+              },
+            ],
+          },
+        ],
+      })
+    ).toThrow("node count mismatch")
+  })
+
   it("includes bundle id and locale in error message", () => {
     expect(() =>
       validateTranslations({
