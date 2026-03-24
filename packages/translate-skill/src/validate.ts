@@ -1,4 +1,4 @@
-import { pathToFileURL } from "node:url"
+import { fileURLToPath } from "node:url"
 import { Value } from "@sinclair/typebox/value"
 import { Pattern, type Variant } from "@inlang/sdk"
 
@@ -26,8 +26,8 @@ export function validateTranslations(input: { translations: TranslationToValidat
       const tgt = t.variants[i]!
 
       if (!Value.Check(Pattern, tgt.pattern)) {
-        const errors = [...Value.Errors(Pattern, tgt.pattern)]
-        throw new Error(`${label} variant ${i}: ${errors[0]?.message ?? "pattern schema violation"}`)
+        const errors = Value.Errors(Pattern, tgt.pattern)
+        throw new Error(`${label} variant ${i}: ${errors.First()?.message ?? "pattern schema violation"}`)
       }
 
       if (src.pattern.length !== tgt.pattern.length) {
@@ -39,9 +39,9 @@ export function validateTranslations(input: { translations: TranslationToValidat
       for (let j = 0; j < src.pattern.length; j++) {
         const srcNode = src.pattern[j]!
         const tgtNode = tgt.pattern[j]
-        if (!tgtNode || srcNode.type !== tgtNode.type) {
+        if (srcNode.type !== tgtNode!.type) {
           throw new Error(
-            `${label} variant ${i}: node ${j} type changed from '${srcNode.type}' to '${tgtNode?.type ?? "undefined"}'`
+            `${label} variant ${i}: node ${j} type changed from '${srcNode.type}' to '${tgtNode!.type}'`
           )
         }
       }
@@ -50,7 +50,7 @@ export function validateTranslations(input: { translations: TranslationToValidat
 }
 
 // Script entry — reads stdin, validates, exits non-zero on failure
-if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (process.argv.includes("--help")) {
     process.stdout.write(
       "Usage: node dist/validate.js < input.json\n" +

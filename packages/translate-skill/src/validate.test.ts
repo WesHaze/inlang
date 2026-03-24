@@ -12,6 +12,10 @@ const sourceVariants = [
 ]
 
 describe("validateTranslations", () => {
+  it("passes when translations array is empty", () => {
+    expect(() => validateTranslations({ translations: [] })).not.toThrow()
+  })
+
   it("passes a valid translation", () => {
     expect(() =>
       validateTranslations({
@@ -132,6 +136,6 @@ describe("validateTranslations", () => {
           },
         ],
       })
-    ).toThrow("my-bundle")
+    ).toThrow("bundle 'my-bundle' [de]")
   })
 })
