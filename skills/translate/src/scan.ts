@@ -4,6 +4,7 @@ import fs from "node:fs"
 import {
   loadProjectFromDirectory,
   selectBundleNested,
+  hasMissingTranslations,
   type InlangProject,
   type Declaration,
   type Variant,
@@ -51,10 +52,10 @@ export async function generateScanOutput(project: InlangProject, config: Config)
 
     for (const locale of targetLocales) {
       const message = bundle.messages.find((m) => m.locale === locale)
-      if (!message || message.variants.length === 0) {
+      if (hasMissingTranslations(bundle, [locale])) {
         missingLocales.push({ locale, existingMessageId: message?.id ?? null })
       } else {
-        existingTranslations[locale] = message.variants.map((v) => ({
+        existingTranslations[locale] = message!.variants.map((v) => ({
           matches: v.matches,
           pattern: v.pattern,
         }))

@@ -4,7 +4,7 @@ import { Bundle, loadProjectInMemory, ProjectSettings } from "@inlang/sdk";
 import { atomWithStorage } from "jotai/utils";
 import { jsonObjectFrom } from "kysely/helpers/sqlite";
 import { Change, isInSimulatedCurrentBranch } from "@inlang/sdk";
-import hasMissingTranslations from "./helper/hasMissingTranslations.ts";
+import { hasMissingTranslations } from "@inlang/sdk";
 import getSortedBundles from "./helper/sortBundles.ts";
 // @ts-expect-error - the plugin ships with no declaration file
 import i18nextPlugin from "@inlang/plugin-i18next";
