@@ -73,7 +73,9 @@ Where the validate input is:
 }
 ```
 
-If validate exits non-zero, read the error from stderr, fix the translation (the error tells you exactly what went wrong), and retry. Retry up to `config.hallucinationRetries` times per bundle.
+`sourceVariants` must be copied from the bundle's `sourceVariants` in your batch data — the same source variants you translated from. Include the exact stderr error text in your retry reasoning so the model can target the specific failing node.
+
+If validate exits non-zero, read the error from stderr, fix the translation, and retry. Retry up to `config.hallucinationRetries` times per bundle.
 
 Return to the main agent:
 ```json
