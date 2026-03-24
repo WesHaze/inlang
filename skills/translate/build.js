@@ -39,7 +39,7 @@ const __dirname = pathPolyfill.dirname(__filename)
   },
 })
 
-async function copyAssets(): Promise<void> {
+async function copyAssets() {
   await mkdir(join(outSkillDir, "references"), { recursive: true })
   await copyFile(join(__dirname, "SKILL.md"), join(outSkillDir, "SKILL.md"))
   await copyFile(join(__dirname, "config.json"), join(outSkillDir, "config.json"))
