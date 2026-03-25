@@ -1,5 +1,5 @@
 import { context } from "esbuild"
-import { copyFile, cp, mkdir, rm } from "node:fs/promises"
+import { copyFile, mkdir, rm } from "node:fs/promises"
 import { fileURLToPath } from "node:url"
 import { dirname, join } from "node:path"
 
@@ -40,10 +40,9 @@ const __dirname = pathPolyfill.dirname(__filename)
 })
 
 async function copyAssets() {
-  await mkdir(join(outSkillDir, "references"), { recursive: true })
+  await mkdir(outSkillDir, { recursive: true })
   await copyFile(join(__dirname, "SKILL.md"), join(outSkillDir, "SKILL.md"))
   await copyFile(join(__dirname, "config.json"), join(outSkillDir, "config.json"))
-  await cp(join(__dirname, "references"), join(outSkillDir, "references"), { recursive: true })
 }
 
 if (isProduction) {

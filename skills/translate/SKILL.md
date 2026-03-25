@@ -22,7 +22,7 @@ Edit `config.json` in the skill directory before running:
 node scripts/scan.js [--force]
 ```
 
-Store the full JSON output — it contains `projectPath` and everything needed for translation and writing. `--force` overwrites existing translations instead of only filling missing ones.
+Store the full JSON output — it contains `projectPath` and everything needed for translation and writing. `--force` overwrites existing translations instead of only filling missing ones. If the user asked to force, overwrite, or regenerate existing translations, append `--force` to the command.
 
 ### 2. Translate batches
 Process the batches from the scan output using `project.baseLocale` and `interpretationContext` as context. Subagents can be used to process batches in parallel — forward the following instructions to each:

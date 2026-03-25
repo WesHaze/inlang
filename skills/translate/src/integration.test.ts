@@ -4,7 +4,7 @@ import { generateScanOutput } from "./scan.js"
 import { validateTranslations } from "./validate.js"
 import { writeTranslations } from "./write.js"
 
-const defaultConfig = { bundleBatchSize: 20, interpretationContext: "", hallucinationRetries: 3 }
+const defaultConfig = { bundleBatchSize: 20, interpretationContext: "", hallucinationRetries: 3, force: false }
 
 describe("integration: scan → validate → write", () => {
   it("translates a simple missing variant end-to-end", async () => {
@@ -36,11 +36,11 @@ describe("integration: scan → validate → write", () => {
     })
 
     // 1. Scan
-    const scanOutput = await generateScanOutput(project, defaultConfig)
+    const scanOutput = await generateScanOutput("test-project", project, defaultConfig)
     expect(scanOutput.batches).toHaveLength(1)
     const bundle = scanOutput.batches[0]!.bundles[0]!
     expect(bundle.id).toBe("greeting")
-    expect(bundle.missingLocales).toEqual([{ locale: "de", existingMessageId: null }])
+    expect(bundle.targetLocales).toEqual([{ locale: "de", existingMessageId: null }])
 
     // 2. Simulate agent: produce translation (only text nodes changed)
     const sourceVariant = bundle.sourceVariants[0]!
@@ -73,7 +73,7 @@ describe("integration: scan → validate → write", () => {
           locale: "de",
           declarations: bundle.declarations,
           selectors: bundle.selectors,
-          existingMessageId: bundle.missingLocales[0]!.existingMessageId,
+          existingMessageId: bundle.targetLocales[0]!.existingMessageId,
           variants: [translatedVariant],
         },
       ],
@@ -108,7 +108,7 @@ describe("integration: scan → validate → write", () => {
       ],
     })
 
-    const before = await generateScanOutput(project, defaultConfig)
+    const before = await generateScanOutput("test-project", project, defaultConfig)
     expect(before.batches[0]!.bundles).toHaveLength(1)
 
     await writeTranslations(project, {
@@ -117,7 +117,7 @@ describe("integration: scan → validate → write", () => {
       ],
     })
 
-    const after = await generateScanOutput(project, defaultConfig)
+    const after = await generateScanOutput("test-project", project, defaultConfig)
     expect(after.batches).toHaveLength(0)
   })
 })
