@@ -15,9 +15,10 @@ type Config = {
   bundleBatchSize: number
   interpretationContext: string
   hallucinationRetries: number
+  force: boolean
 }
 
-type MissingLocale = { locale: string; existingMessageId: string | null }
+type TargetLocale = { locale: string; existingMessageId: string | null }
 
 type ScanBundle = {
   id: string
@@ -25,16 +26,17 @@ type ScanBundle = {
   selectors: VariableReference[]
   sourceVariants: Array<Pick<Variant, "matches" | "pattern">>
   existingTranslations: Record<string, Array<Pick<Variant, "matches" | "pattern">>>
-  missingLocales: MissingLocale[]
+  targetLocales: TargetLocale[]
 }
 
 type ScanOutput = {
+  projectPath: string
   project: { baseLocale: string; locales: string[] }
   interpretationContext: string
   batches: Array<{ bundles: ScanBundle[] }>
 }
 
-export async function generateScanOutput(project: InlangProject, config: Config): Promise<ScanOutput> {
+export async function generateScanOutput(projectPath: string, project: InlangProject, config: Config): Promise<ScanOutput> {
   const settings = await project.settings.get()
   const { baseLocale, locales } = settings
   const targetLocales = locales.filter((l) => l !== baseLocale)
@@ -47,13 +49,13 @@ export async function generateScanOutput(project: InlangProject, config: Config)
     const sourceMessage = bundle.messages.find((m) => m.locale === baseLocale)
     if (!sourceMessage || sourceMessage.variants.length === 0) continue
 
-    const missingLocales: MissingLocale[] = []
+    const bundleTargetLocales: TargetLocale[] = []
     const existingTranslations: Record<string, Array<Pick<Variant, "matches" | "pattern">>> = {}
 
     for (const locale of targetLocales) {
       const message = bundle.messages.find((m) => m.locale === locale)
-      if (hasMissingTranslations(bundle, [locale])) {
-        missingLocales.push({ locale, existingMessageId: message?.id ?? null })
+      if (config.force || hasMissingTranslations(bundle, [locale])) {
+        bundleTargetLocales.push({ locale, existingMessageId: message?.id ?? null })
       } else {
         existingTranslations[locale] = message!.variants.map((v) => ({
           matches: v.matches,
@@ -62,7 +64,7 @@ export async function generateScanOutput(project: InlangProject, config: Config)
       }
     }
 
-    if (missingLocales.length === 0) continue
+    if (!config.force && bundleTargetLocales.length === 0) continue
 
     missingBundles.push({
       id: bundle.id,
@@ -70,7 +72,7 @@ export async function generateScanOutput(project: InlangProject, config: Config)
       selectors: sourceMessage.selectors,
       sourceVariants: sourceMessage.variants.map((v) => ({ matches: v.matches, pattern: v.pattern })),
       existingTranslations,
-      missingLocales,
+      targetLocales: bundleTargetLocales,
     })
   }
 
@@ -80,6 +82,7 @@ export async function generateScanOutput(project: InlangProject, config: Config)
   }
 
   return {
+    projectPath,
     project: { baseLocale, locales },
     interpretationContext: config.interpretationContext,
     batches,
@@ -109,7 +112,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 
   const configPath = fileURLToPath(new URL("../config.json", import.meta.url))
 
-  let config: Config = { bundleBatchSize: 20, interpretationContext: "", hallucinationRetries: 3 }
+  const force = process.argv.includes("--force")
+
+  let config: Config = { bundleBatchSize: 20, interpretationContext: "", hallucinationRetries: 3, force }
   try {
     const raw = JSON.parse(fs.readFileSync(configPath, "utf8"))
     config = {
@@ -117,6 +122,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       interpretationContext: typeof raw.interpretationContext === "string" ? raw.interpretationContext : "",
       hallucinationRetries:
         Number.isInteger(raw.hallucinationRetries) && raw.hallucinationRetries > 0 ? raw.hallucinationRetries : 3,
+      force,
     }
   } catch {
     // Use defaults if config.json is missing or invalid
@@ -133,7 +139,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     process.exit(1)
   }
 
-  const output = await generateScanOutput(project, config)
+  const output = await generateScanOutput(projectPath, project, config)
   await project.close()
 
   if (output.batches.length === 0) {

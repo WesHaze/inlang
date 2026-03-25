@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto"
 import { fileURLToPath } from "node:url"
 import fs from "node:fs"
 import fsPromises from "node:fs/promises"
-import { resolve } from "node:path"
 import { Type, type Static } from "@sinclair/typebox"
 import {
   loadProjectFromDirectory,
@@ -68,34 +67,18 @@ export async function writeTranslations(
 
 // Script entry
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const cwd = process.cwd()
-  const entries = fs.readdirSync(cwd, { withFileTypes: true })
-  const matches = entries
-    .filter((e) => e.isDirectory() && e.name.endsWith(".inlang"))
-    .map((e) => resolve(cwd, e.name))
-
-  if (matches.length === 0) {
-    process.stderr.write("Error: no *.inlang project found in current directory.\n")
-    process.exit(1)
-  }
-  if (matches.length > 1) {
-    process.stderr.write(
-      `Error: multiple *.inlang projects found:\n${matches.join("\n")}\n`
-    )
-    process.exit(1)
-  }
-
-  const projectPath = matches[0]!
-  const project = await loadProjectFromDirectory({ path: projectPath, fs })
-
   let raw = ""
   process.stdin.setEncoding("utf8")
   for await (const chunk of process.stdin) {
     raw += chunk
   }
 
+  const input = JSON.parse(raw)
+  const projectPath: string = input.projectPath
+  const project = await loadProjectFromDirectory({ path: projectPath, fs })
+
   try {
-    await writeTranslations(project, JSON.parse(raw))
+    await writeTranslations(project, input)
     await saveProjectToDirectory({ fs: fsPromises, path: projectPath, project })
   } finally {
     await project.close()
