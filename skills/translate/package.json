@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "cross-env NODE_ENV=production tsx ./build.ts && tsc --noEmit",
-    "dev": "tsx ./build.ts",
+    "build": "cross-env NODE_ENV=production node ./build.js && tsc --noEmit",
+    "dev": "node ./build.js",
     "test": "tsc --noEmit && vitest run",
     "typecheck": "tsc --noEmit"
   },
